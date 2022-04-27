@@ -24,31 +24,30 @@ Resources - Bridges Machines:
 ○ Interconnect: PCIe
 ○ Cache: 2.75 MB last level cache, 6 memory channels
 ○ Local Storage: 4x 2 TB NVMe SSD
-○ Network: 2x Mellanox ConnectX-6-HDR Infiniband 200Gb/s Adapter
+○ Network: 2x Mellanox ConnectX-6-HDR Infiniband 200 Gb/s Adapter
 
 Goals:
 - 75% - Implement a parallel A* algorithm using MPI and lock-free priority queue.
 - 100% - Improve workload balance of the implementations and perform experiments
 - 125% - Implement parallel A* algorithm on GPUs or use a different lock-free priority queue implementation
 
-Regular Memory (512x)
-○ CPU: 2x AMD EPYC 7742 (2.25-3.40 GHz, 2x64 cores per node)
-○ RAM: 256 GB
-○ Cache: 256 MB L3 cache, 8 memory channels
-○ Local Storage: 3.84 TB NVMe SSD
-○ Network: Mellanox ConnectX-6-HDR Infiniband 200Gb/s Adapter
-2. V100 GPU (9x)
-○ GPU: 8x NVIDIA V100-16GB
-○ CPU: 2x Intel Xeon Gold 6148 (2.40-3.70 GHz, 2x20 cores per node)
-○ RAM: 192 GB, DDR4-2933
-○ Interconnect: PCIe
-○ Cache: 2.75 MB last level cache, 6 memory channels
-○ Local Storage: 4x 2 TB NVMe SSD
-○ Network: 2x Mellanox ConnectX-6-HDR Infiniband 200Gb/s Adapter
-
 Schedule-
-Week 1- Implement parallel Ang contention based priority queue
+Week 1- Implement parallel And contention based priority queue
 Week 2- Use Message Passing Model to reduce contention
 Week 3- Implement lock-free priority queue using multi-dimensional list
 Week 4- Optimize workload balance using different techniques
 Week 5- Create a distributed set of priority queues for A* implementation on GPUs
+
+
+Milestone-
+
+1. The main goal of our project is implementing a lock-free priority queue using one the methods which have been published. After much research we were able to find three papers with different implementations of concurrent priority queues which used a mound, skip-list and multidimensional linked list. After reading the three papers carefully we have chosen to work with the multi-dimensional list mainly because it had better experimental performance than the other two data structures. We have not been able to get a working implementation because we were heavily involved in booth before and during carnival. 
+2. We have implemented a sequential version of A*, a naive parallel implementation of A* using a locked priority queue. Although we have perfomed conclusive experiments, due to priority queue being mutually exclusive there was not much speedup. Our next goal is to implment a MPI based version where a thread assigns work to nodes to prevent the inefficiency in locking. 
+
+Due to the tremendous booth work and carnival, we were unable to get through to the week 2 deliverables. Because of this our revised schedule looks as follows:
+Week 3 - Get a MPI version working and perform first round of experiments
+Week 4 - Finish lock free priority queue implementation and perform second round of experiments
+Week 5 - Look into work load balance optimizations, parallelization on GPU, approximate concurrent priorirty queue as suggested in comments 
+
+At the demo session, we aim to provide graphs in terms of speedups of different methods, workload balance among nodes and a graph depicting work divided between overhead, synchronization and computation. We also want to provide a visualization for parallel A* graph compared to rudimentary sequential graph search algorithms.
+Currently we have no concerns and find ourselves in a good position in terms of understanding the requirements and the project at hand.
