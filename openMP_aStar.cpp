@@ -28,6 +28,23 @@ using namespace std::chrono;
 // Note: We adpated an existing sequential implementation from www.geeksforgeeks.org
 using namespace std;
 
+static int _argc;
+static const char **_argv;
+
+const char *get_option_string(const char *option_name, const char *default_value) {
+    for (int i = _argc - 2; i >= 0; i -= 2)
+        if (strcmp(_argv[i], option_name) == 0)
+            return _argv[i + 1];
+    return default_value;
+}
+
+int get_option_int(const char *option_name, int default_value) {
+    for (int i = _argc - 2; i >= 0; i -= 2)
+        if (strcmp(_argv[i], option_name) == 0)
+            return atoi(_argv[i + 1]);
+    return default_value;
+}
+
 // Creating a shortcut for int, int pair type
 typedef pair<int, int> Pair;
 
@@ -144,7 +161,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	// Declare a 2D array of structure to hold the details
 	// of that cell
 	cell cellDetails[dim_x][dim_y];
-
 	int l, m;
 
 	for (l = 0; l < dim_y; l++) {
@@ -183,100 +199,107 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	// the destination is not reached.
 	bool foundDest = false;
 
-	while (openList.size() != 0 && !(foundDest)) {
-		#pragma omp parallel
-		{
+	omp_lock_t openListLock, closeListLock,cellLock;
+	omp_init_lock(&closeListLock); //cas
+	omp_init_lock(&openListLock); //concurrent PQ
+	omp_init_lock(&cellLock); //cas 
+
+	#pragma omp parallel
+	{
+		while (!foundDest) {
 			pPair p;
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
 			double gNew, hNew, fNew;
-			bool localValid = false;
-			#pragma omp critical
-			{
-				if (openList.size() != 0) {
-					p = openList.top();
-				    openList.pop();
-					localValid = true;
+			// printf("here\n");
+			omp_set_lock(&openListLock);
+			// printf("here\n");
+			if(openList.size() == 0){
+				omp_unset_lock(&openListLock);
+				continue;
+			}
+			p = openList.top();
+			openList.pop();
+			omp_unset_lock(&openListLock);
+
+			// Add this vertex to the closed list
+			i = p.second.first;
+			j = p.second.second;
+
+			omp_set_lock(&closeListLock);
+			if(closedList[i][j]){
+				omp_unset_lock(&closeListLock);
+				continue;
+			}
+			closedList[i][j] = true;
+			omp_unset_lock(&closeListLock);
+
+			/*
+			Generating all the 4 successor of this cell
+			Cell-->Popped Cell (i, j)
+			N --> North	 (i-1, j)
+			S --> South	 (i+1, j)
+			E --> East	 (i, j+1)
+			W --> West   (i, j-1)*/
+
+			for (z = 0; z < 4; z++) {
+				// Only process this cell if this is a valid one
+				// int x, y;
+				if (z==0) {
+					x = i-1;
+					y = j;
+				}
+				else if (z==1) {
+					x = i+1;
+					y = j;
+				}
+				else if (z==2) {
+					x = i;
+					y = j+1;
 				}
 				else {
-					localValid = false;
+					x = i;
+					y = j-1;
 				}
-			}
-			// int i, j;
-			if (localValid) {
-				// Add this vertex to the closed list
-				i = p.second.first;
-				j = p.second.second;
-				closedList[i][j] = true;
-
-				/*
-				Generating all the 4 successor of this cell
-				Cell-->Popped Cell (i, j)
-				N --> North	 (i-1, j)
-				S --> South	 (i+1, j)
-				E --> East	 (i, j+1)
-				W --> West   (i, j-1)*/
-
-				for (z = 0; z < 4; z++) {
-					// Only process this cell if this is a valid one
-					// int x, y;
-					if (z==0) {
-						x = i-1;
-						y = j;
-					}
-					else if (z==1) {
-						x = i+1;
-						y = j;
-					}
-					else if (z==2) {
-						x = i;
-						y = j+1;
-					}
-					else {
-						x = i;
-						y = j-1;
-					}
-					
-					if (isValid(x, y, dim_x, dim_y) == true) {
-						// If the destination cell is the same as the
-						// current successor
-						if (isDestination(x, y, dest) == true) {
-							printf("hi\n");
-							// Set the Parent of the destination cell
-							cellDetails[x][y].parent_i = i;
-							cellDetails[x][y].parent_j = j;
-							printf("The destination cell is found\n");
-							tracePath((cell*)((void*)&cellDetails), dest, dim_y);
-							foundDest = true;
-							// localFoundDest = true;
-							// return;
-						}
-						else if (closedList[x][y] == false
-								&& isUnBlocked(map, i, j, dim_y)
-										== true) {
-							gNew = cellDetails[i][j].g + 1.0;
-							hNew = calculateHValue(x, y, dest);
-							fNew = gNew + hNew;
-
-							if (cellDetails[x][y].f == INT_MAX
-								|| cellDetails[x][y].f > fNew) {
-								
-								#pragma omp critical 
-								{
-									openList.push(make_pair(fNew, make_pair(x, y)));
-								}
-
-								// Update the details of this cell
-								cellDetails[x][y].f = fNew;
-								cellDetails[x][y].g = gNew;
-								cellDetails[x][y].h = hNew;
-								cellDetails[x][y].parent_i = i;
-								cellDetails[x][y].parent_j = j;
-							}
-						}
+				
+				if (isValid(x, y, dim_x, dim_y) == true) {
+					// If the destination cell is the same as the
+					// current successor
+					if (isDestination(x, y, dest) == true) {
+						// Set the Parent of the destination cell
+						cellDetails[x][y].parent_i = i;
+						cellDetails[x][y].parent_j = j;
+						printf("The destination cell is found\n");
+						tracePath((cell*)((void*)&cellDetails), dest, dim_y);
+						foundDest = true;
 					}
 				}
-				#pragma omp barrier
+				omp_set_lock(&openListLock);
+				omp_set_lock(&closeListLock);
+				omp_set_lock(&cellLock);
+				if (closedList[x][y] == false
+						&& isUnBlocked(map, i, j, dim_y)
+								== true) {
+					gNew = cellDetails[i][j].g + 1.0;
+					hNew = calculateHValue(x, y, dest);
+					fNew = gNew + hNew;
+
+					if (cellDetails[x][y].f == INT_MAX
+						|| cellDetails[x][y].f > fNew) {
+						
+						openList.push(make_pair(fNew, make_pair(x, y)));
+
+						// Update the details of this cell
+						cellDetails[x][y].f = fNew;
+						cellDetails[x][y].g = gNew;
+						cellDetails[x][y].h = hNew;
+						cellDetails[x][y].parent_i = i;
+						cellDetails[x][y].parent_j = j;
+					}
+				}
+				omp_unset_lock(&cellLock);
+				omp_unset_lock(&closeListLock);
+				omp_unset_lock(&openListLock);
 			}
 		}
 	}
@@ -292,30 +315,35 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	return;
 }
 
-int main(int argc, char *argv[]) {
-    char *inputFilename = NULL;
+int main(int argc, const char *argv[]) {
     int numProc;
-    int opt = 0;
+    // int opt = 0;
+
+	_argc = argc - 1;
+    _argv = argv + 1;
+
+	const char *inputFilename = get_option_string("-f", NULL);
+    numProc = get_option_int("-n", 1);
     
-    // Read command line arguments
-    do {
-        opt = getopt(argc, argv, "f:p");
-        switch (opt) {
-        case 'f':
-            inputFilename = optarg;
-            break;
+    // // Read command line arguments
+    // do {
+    //     opt = getopt(argc, argv, "f:p");
+    //     switch (opt) {
+    //     case 'f':
+    //         inputFilename = optarg;
+    //         break;
 
-        case 'p':
-            numProc = atof(optarg);
-            break;
+    //     case 'p':
+    //         numProc = atoi(optarg);
+    //         break;
 
-        case -1:
-            break;
+    //     case -1:
+    //         break;
 
-        default:
-            break;
-        }
-    } while (opt != -1);
+    //     default:
+    //         break;
+    //     }
+    // } while (opt != -1);
 
     if (inputFilename == NULL) {
         printf("Usage: %s -f <filename> [-p <P>] [-i <N_iters>]\n", argv[0]);
@@ -330,7 +358,7 @@ int main(int argc, char *argv[]) {
     if (!input) {
         printf("Unable to open file: %s.\n", inputFilename);
         return -1;
-    }
+	}
 
     int dim_x, dim_y;
     fscanf(input, "%d %d\n", &dim_x, &dim_y);
@@ -354,7 +382,8 @@ int main(int argc, char *argv[]) {
 	struct timespec requestStart, requestEnd;
 	clock_gettime(CLOCK_REALTIME, &requestStart);
 	omp_set_num_threads(numProc);
-	for (int i = 0; i < 10; i++) {
+	printf("here\n");
+	for (int i = 0; i < 1; i++) {
 		aStarSearch(map, src, dest, dim_x, dim_y);
 	}
 	clock_gettime(CLOCK_REALTIME, &requestEnd);
