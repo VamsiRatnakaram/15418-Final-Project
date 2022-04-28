@@ -16,6 +16,12 @@
 #include <bits/stdc++.h>
 #include <chrono>
 #include <time.h>
+#include <sys/time.h>
+#include <omp.h>
+
+#define BILLION  1E9;
+
+// #include "CycleTimer.h"
 using namespace std::chrono;
 
 // A C++ Program to implement A* Search Algorithm
@@ -139,25 +145,25 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	// of that cell
 	cell cellDetails[dim_x][dim_y];
 
-	int i, j;
+	int l, m;
 
-	for (i = 0; i < dim_y; i++) {
-		for (j = 0; j < dim_x; j++) {
-			cellDetails[i][j].f = INT_MAX;
-			cellDetails[i][j].g = INT_MAX;
-			cellDetails[i][j].h = INT_MAX;
-			cellDetails[i][j].parent_i = -1;
-			cellDetails[i][j].parent_j = -1;
+	for (l = 0; l < dim_y; l++) {
+		for (m = 0; m < dim_x; m++) {
+			cellDetails[l][m].f = INT_MAX;
+			cellDetails[l][m].g = INT_MAX;
+			cellDetails[l][m].h = INT_MAX;
+			cellDetails[l][m].parent_i = -1;
+			cellDetails[l][m].parent_j = -1;
 		}
 	}
 
 	// Initialising the parameters of the starting node
-	i = src.first, j = src.second;
-	cellDetails[i][j].f = 0.0;
-	cellDetails[i][j].g = 0.0;
-	cellDetails[i][j].h = 0.0;
-	cellDetails[i][j].parent_i = i;
-	cellDetails[i][j].parent_j = j;
+	l = src.first, m = src.second;
+	cellDetails[l][m].f = 0.0;
+	cellDetails[l][m].g = 0.0;
+	cellDetails[l][m].h = 0.0;
+	cellDetails[l][m].parent_i = l;
+	cellDetails[l][m].parent_j = m;
 
 	/*
 	Create an priority queue having information as-
@@ -171,84 +177,115 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
-	openList.push(make_pair(0.0, make_pair(i, j)));
+	openList.push(make_pair(0.0, make_pair(l, m)));
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
 	bool foundDest = false;
 
-	while (openList.size() != 0) {
-		pPair p = openList.top();
-        openList.pop();
+	while (openList.size() != 0 && !(foundDest)) {
+		#pragma omp parallel
+		{
+			pPair p;
+			int i, j, x, y, z;
+			// To store the 'g', 'h' and 'f' of the 4 successors
+			double gNew, hNew, fNew;
+			bool localValid = false;
+			#pragma omp critical
+			{
+				if (openList.size() != 0) {
+					p = openList.top();
+				    openList.pop();
+					localValid = true;
+				}
+				else {
+					localValid = false;
+				}
+			}
+			// int i, j;
+			if (localValid) {
+				// Add this vertex to the closed list
+				i = p.second.first;
+				j = p.second.second;
+				closedList[i][j] = true;
 
-		// Add this vertex to the closed list
-		i = p.second.first;
-		j = p.second.second;
-        if(closedList[i][j]){
-            continue;
-            
-        }
-		closedList[i][j] = true;
+				/*
+				Generating all the 4 successor of this cell
+				Cell-->Popped Cell (i, j)
+				N --> North	 (i-1, j)
+				S --> South	 (i+1, j)
+				E --> East	 (i, j+1)
+				W --> West   (i, j-1)*/
 
-		// To store the 'g', 'h' and 'f' of the 4 successors
-		double gNew, hNew, fNew;
+				for (z = 0; z < 4; z++) {
+					// Only process this cell if this is a valid one
+					// int x, y;
+					if (z==0) {
+						x = i-1;
+						y = j;
+					}
+					else if (z==1) {
+						x = i+1;
+						y = j;
+					}
+					else if (z==2) {
+						x = i;
+						y = j+1;
+					}
+					else {
+						x = i;
+						y = j-1;
+					}
+					
+					if (isValid(x, y, dim_x, dim_y) == true) {
+						// If the destination cell is the same as the
+						// current successor
+						if (isDestination(x, y, dest) == true) {
+							printf("hi\n");
+							// Set the Parent of the destination cell
+							cellDetails[x][y].parent_i = i;
+							cellDetails[x][y].parent_j = j;
+							printf("The destination cell is found\n");
+							tracePath((cell*)((void*)&cellDetails), dest, dim_y);
+							foundDest = true;
+							// localFoundDest = true;
+							// return;
+						}
+						else if (closedList[x][y] == false
+								&& isUnBlocked(map, i, j, dim_y)
+										== true) {
+							gNew = cellDetails[i][j].g + 1.0;
+							hNew = calculateHValue(x, y, dest);
+							fNew = gNew + hNew;
 
-        for (int z = 0; z < 4; z++) {
-            // Only process this cell if this is a valid one
-            int x, y;
-            if (z==0) {
-                x = i-1;
-                y = j;
-            }
-            else if (z==1) {
-                x = i+1;
-                y = j;
-            }
-            else if (z==2) {
-                x = i;
-                y = j+1;
-            }
-            else {
-                x = i;
-                y = j-1;
-            }
-            
-		    if (isValid(x, y, dim_x, dim_y) == true) {
-                // If the destination cell is the same as the
-                // current successor
-                if (isDestination(x, y, dest) == true) {
-                    // Set the Parent of the destination cell
-                    cellDetails[x][y].parent_i = i;
-                    cellDetails[x][y].parent_j = j;
-                    printf("The destination cell is found\n");
-                    tracePath((cell*)((void*)&cellDetails), dest, dim_y);
-                    foundDest = true;
-                    return;
-                }
-                else if (closedList[x][y] == false
-                        && isUnBlocked(map, i - 1, j, dim_y)
-                                == true) {
-                    gNew = cellDetails[i][j].g + 1.0;
-                    hNew = calculateHValue(x, y, dest);
-                    fNew = gNew + hNew;
+							if (cellDetails[x][y].f == INT_MAX
+								|| cellDetails[x][y].f > fNew) {
+								
+								#pragma omp critical 
+								{
+									openList.push(make_pair(fNew, make_pair(x, y)));
+								}
 
-                    if (cellDetails[x][y].f == INT_MAX
-                        || cellDetails[x][y].f > fNew) {
-                        openList.push(make_pair(
-                            fNew, make_pair(x, y)));
-
-                        // Update the details of this cell
-                        cellDetails[x][y].f = fNew;
-                        cellDetails[x][y].g = gNew;
-                        cellDetails[x][y].h = hNew;
-                        cellDetails[x][y].parent_i = i;
-                        cellDetails[x][y].parent_j = j;
-                    }
-                }
-            }
-        }
+								// Update the details of this cell
+								cellDetails[x][y].f = fNew;
+								cellDetails[x][y].g = gNew;
+								cellDetails[x][y].h = hNew;
+								cellDetails[x][y].parent_i = i;
+								cellDetails[x][y].parent_j = j;
+							}
+						}
+					}
+				}
+				#pragma omp barrier
+			}
+		}
 	}
-    
+
+	// When the destination cell is not found and the open
+	// list is empty, then we conclude that we failed to
+	// reach the destination cell. This may happen when the
+	// there is no way to destination cell (due to
+	// blockages)
 	if (foundDest == false)
 		printf("Failed to find the Destination Cell\n");
 
@@ -297,8 +334,10 @@ int main(int argc, char *argv[]) {
 
     int dim_x, dim_y;
     fscanf(input, "%d %d\n", &dim_x, &dim_y);
+	printf("%d %d\n", dim_x, dim_y);
 
     int *map = (int*)calloc(dim_x*dim_y, sizeof(int));
+	printf("%d \n", sizeof(*map));
     for (int i = 0; i < dim_x; i++) {
         for (int j = 0; j < dim_y; j++) {
             fscanf(input, "%d ", &map[i*dim_y + j]);
@@ -311,15 +350,19 @@ int main(int argc, char *argv[]) {
     Pair dest = make_pair(dim_x - 1, dim_y - 1);
 
     // A* Sequential Algorithm
-	clock_t start = clock();
-	for (int i = 0; i < 100; i++) {
+	// Calculate time taken by a request
+	struct timespec requestStart, requestEnd;
+	clock_gettime(CLOCK_REALTIME, &requestStart);
+	omp_set_num_threads(numProc);
+	for (int i = 0; i < 10; i++) {
 		aStarSearch(map, src, dest, dim_x, dim_y);
 	}
-	clock_t end = clock();
-	double elapsed = double(end - start)/CLOCKS_PER_SEC;
+	clock_gettime(CLOCK_REALTIME, &requestEnd);
+	// Calculate time it took
+	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 
 	printf("\n");
-	printf("Total Execution Time: %f", elapsed);
+	printf("Total Execution Time: %lf\n", accum);
  
     return (0);
 }
