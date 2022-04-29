@@ -24,8 +24,6 @@
 // #include "CycleTimer.h"
 using namespace std::chrono;
 
-// A C++ Program to implement A* Search Algorithm
-// Note: We adpated an existing sequential implementation from www.geeksforgeeks.org
 using namespace std;
 
 static int _argc;
