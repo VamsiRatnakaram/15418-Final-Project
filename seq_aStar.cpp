@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
 	// Calculate time taken by a request
 	struct timespec requestStart, requestEnd;
 	clock_gettime(CLOCK_REALTIME, &requestStart);
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < 1; i++) {
 		aStarSearch(map, src, dest, dim_x, dim_y);
 	}
 	clock_gettime(CLOCK_REALTIME, &requestEnd);

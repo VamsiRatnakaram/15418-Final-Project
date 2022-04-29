@@ -206,6 +206,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	#pragma omp parallel
 	{
+		int e=0;
+		// printf("Num threads:%d \n",omp_get_num_threads());
 		while (!foundDest) {
 			pPair p;
 			int i, j, x, y, z;
@@ -221,7 +223,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 			p = openList.top();
 			openList.pop();
 			omp_unset_lock(&openListLock);
-
 			// Add this vertex to the closed list
 			i = p.second.first;
 			j = p.second.second;
@@ -232,16 +233,17 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 				continue;
 			}
 			closedList[i][j] = true;
+			e++;
 			omp_unset_lock(&closeListLock);
-
-			/*
+			// printf("Thread worked on %d, Elements worked on:%d \n",omp_get_thread_num(),e);
+			/*	
 			Generating all the 4 successor of this cell
 			Cell-->Popped Cell (i, j)
 			N --> North	 (i-1, j)
 			S --> South	 (i+1, j)
 			E --> East	 (i, j+1)
 			W --> West   (i, j-1)*/
-
+			bool notDone=true;
 			for (z = 0; z < 4; z++) {
 				// Only process this cell if this is a valid one
 				// int x, y;
@@ -269,39 +271,41 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// Set the Parent of the destination cell
 						cellDetails[x][y].parent_i = i;
 						cellDetails[x][y].parent_j = j;
-						printf("The destination cell is found\n");
+						printf("The destination cell is found\n");	
 						tracePath((cell*)((void*)&cellDetails), dest, dim_y);
 						foundDest = true;
+						notDone=false;
 					}
-				}
-				omp_set_lock(&openListLock);
-				omp_set_lock(&closeListLock);
-				omp_set_lock(&cellLock);
-				if (closedList[x][y] == false
-						&& isUnBlocked(map, i, j, dim_y)
-								== true) {
-					gNew = cellDetails[i][j].g + 1.0;
-					hNew = calculateHValue(x, y, dest);
-					fNew = gNew + hNew;
+					omp_set_lock(&openListLock);
+					omp_set_lock(&closeListLock);
+					omp_set_lock(&cellLock);
+					if (closedList[x][y] == false
+							&& isUnBlocked(map, i, j, dim_y)
+									== true && notDone) {
+						gNew = cellDetails[i][j].g + 1.0;
+						hNew = calculateHValue(x, y, dest);
+						fNew = gNew + hNew;
 
-					if (cellDetails[x][y].f == INT_MAX
-						|| cellDetails[x][y].f > fNew) {
-						
-						openList.push(make_pair(fNew, make_pair(x, y)));
+						if (cellDetails[x][y].f == INT_MAX
+							|| cellDetails[x][y].f > fNew) {
+							
+							openList.push(make_pair(fNew, make_pair(x, y)));
 
-						// Update the details of this cell
-						cellDetails[x][y].f = fNew;
-						cellDetails[x][y].g = gNew;
-						cellDetails[x][y].h = hNew;
-						cellDetails[x][y].parent_i = i;
-						cellDetails[x][y].parent_j = j;
+							// Update the details of this cell
+							cellDetails[x][y].f = fNew;
+							cellDetails[x][y].g = gNew;
+							cellDetails[x][y].h = hNew;
+							cellDetails[x][y].parent_i = i;
+							cellDetails[x][y].parent_j = j;
+						}
 					}
+					omp_unset_lock(&cellLock);
+					omp_unset_lock(&closeListLock);
+					omp_unset_lock(&openListLock);
 				}
-				omp_unset_lock(&cellLock);
-				omp_unset_lock(&closeListLock);
-				omp_unset_lock(&openListLock);
 			}
 		}
+		printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
 
 	// When the destination cell is not found and the open
@@ -323,7 +327,7 @@ int main(int argc, const char *argv[]) {
     _argv = argv + 1;
 
 	const char *inputFilename = get_option_string("-f", NULL);
-    numProc = get_option_int("-n", 1);
+    numProc = get_option_int("-p", 1);
     
     // // Read command line arguments
     // do {
@@ -362,10 +366,8 @@ int main(int argc, const char *argv[]) {
 
     int dim_x, dim_y;
     fscanf(input, "%d %d\n", &dim_x, &dim_y);
-	printf("%d %d\n", dim_x, dim_y);
 
     int *map = (int*)calloc(dim_x*dim_y, sizeof(int));
-	printf("%d \n", sizeof(*map));
     for (int i = 0; i < dim_x; i++) {
         for (int j = 0; j < dim_y; j++) {
             fscanf(input, "%d ", &map[i*dim_y + j]);
@@ -382,7 +384,6 @@ int main(int argc, const char *argv[]) {
 	struct timespec requestStart, requestEnd;
 	clock_gettime(CLOCK_REALTIME, &requestStart);
 	omp_set_num_threads(numProc);
-	printf("here\n");
 	for (int i = 0; i < 1; i++) {
 		aStarSearch(map, src, dest, dim_x, dim_y);
 	}
