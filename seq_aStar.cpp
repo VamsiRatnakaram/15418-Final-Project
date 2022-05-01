@@ -226,7 +226,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                 // If the destination cell is the same as the
                 // current successor
                 if (isDestination(x, y, dest) == true) {
-					printf("hi\n");
                     // Set the Parent of the destination cell
                     cellDetails[x][y].parent_i = i;
                     cellDetails[x][y].parent_j = j;
@@ -312,10 +311,8 @@ int main(int argc, char *argv[]) {
 
     int dim_x, dim_y;
     fscanf(input, "%d %d\n", &dim_x, &dim_y);
-	printf("%d %d\n", dim_x, dim_y);
 
     int *map = (int*)calloc(dim_x*dim_y, sizeof(int));
-	printf("%d \n", sizeof(*map));
     for (int i = 0; i < dim_x; i++) {
         for (int j = 0; j < dim_y; j++) {
             fscanf(input, "%d ", &map[i*dim_y + j]);
