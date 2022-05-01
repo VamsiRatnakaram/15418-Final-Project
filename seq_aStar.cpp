@@ -183,13 +183,20 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	bool foundDest = false;
 
 	while (openList.size() != 0) {
+
+		if (foundDest && openList.size() == 0) {
+			break;
+		}
+
 		pPair p = openList.top();
         openList.pop();
 
 		// Add this vertex to the closed list
 		i = p.second.first;
 		j = p.second.second;
-		closedList[i][j] = true;
+		if (closedList[i][j]) {
+			continue;
+		}
 
 		/*
 		Generating all the 4 successor of this cell
@@ -229,13 +236,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                     // Set the Parent of the destination cell
                     cellDetails[x][y].parent_i = i;
                     cellDetails[x][y].parent_j = j;
-                    printf("The destination cell is found\n");
-                    tracePath((cell*)((void*)&cellDetails), dest, dim_y);
                     foundDest = true;
-                    return;
+                    continue;
                 }
-                else if (closedList[x][y] == false
-                        && isUnBlocked(map, i, j, dim_y)
+                else if (isUnBlocked(map, i, j, dim_y)
                                 == true) {
                     gNew = cellDetails[i][j].g + 1.0;
                     hNew = calculateHValue(x, y, dest);
@@ -256,7 +260,12 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                 }
             }
         }
+
+		closedList[i][j] = true;
 	}
+
+	printf("The destination cell is found\n");
+	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
 
 	// When the destination cell is not found and the open
 	// list is empty, then we conclude that we failed to

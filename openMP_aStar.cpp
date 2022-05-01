@@ -206,7 +206,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	{
 		int e=0;
 		// printf("Num threads:%d \n",omp_get_num_threads());
-		while (!foundDest) {
+		while (true) {
+			if (foundDest && openList.size() == 0) {
+				break;
+			}
 			pPair p;
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
@@ -269,8 +272,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// Set the Parent of the destination cell
 						cellDetails[x][y].parent_i = i;
 						cellDetails[x][y].parent_j = j;
-						printf("The destination cell is found\n");	
-						tracePath((cell*)((void*)&cellDetails), dest, dim_y);
 						foundDest = true;
 						notDone=false;
 					}
@@ -305,6 +306,9 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 		}
 		printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
+
+	printf("The destination cell is found\n");	
+	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
 
 	// When the destination cell is not found and the open
 	// list is empty, then we conclude that we failed to

@@ -280,7 +280,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 		// j = p.second.second;
 		// closedList[i][j] = true;
 
-		// printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
+		printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
 
 		/*
 		Generating all the 4 successor of this cell
@@ -330,7 +330,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 							MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
 						}
 					}
-                    continue;
+                    break;
                 }
                 else if (isUnBlocked(map, i, j, dim_x) == true) {
                     gNew = cellDetails[i][j].g + 1.0;
@@ -351,6 +351,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 
 			// Add this vertex to the closed list
 			closedList[i][j] = true;
+
+			// IDK if this necessary
+			// MPI_Status status;
+			// MPI_Wait(&request, &status);
         }
 	}
 
