@@ -195,7 +195,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
-	bool foundDest = false;
+	// bool foundDest = false;
 
 	omp_lock_t openListLock, closeListLock,cellLock;
 	omp_init_lock(&closeListLock); //cas
@@ -206,10 +206,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	{
 		int e=0;
 		// printf("Num threads:%d \n",omp_get_num_threads());
-		while (true) {
-			if (foundDest && openList.size() == 0) {
-				break;
-			}
+		bool loopCondition = true;
+		while (/*!foundDest &&*/ loopCondition) {
 			pPair p;
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
@@ -233,9 +231,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 				omp_unset_lock(&closeListLock);
 				continue;
 			}
-			closedList[i][j] = true;
-			e++;
 			omp_unset_lock(&closeListLock);
+	
 			// printf("Thread worked on %d, Elements worked on:%d \n",omp_get_thread_num(),e);
 			/*	
 			Generating all the 4 successor of this cell
@@ -272,15 +269,13 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// Set the Parent of the destination cell
 						cellDetails[x][y].parent_i = i;
 						cellDetails[x][y].parent_j = j;
-						foundDest = true;
+						// foundDest = true;
 						notDone=false;
 					}
 					omp_set_lock(&openListLock);
 					omp_set_lock(&closeListLock);
 					omp_set_lock(&cellLock);
-					if (closedList[x][y] == false
-							&& isUnBlocked(map, i, j, dim_y)
-									== true && notDone) {
+					if (isUnBlocked(map, i, j, dim_y) == true && notDone) {
 						gNew = cellDetails[i][j].g + 1.0;
 						hNew = calculateHValue(x, y, dest);
 						fNew = gNew + hNew;
@@ -303,20 +298,21 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 					omp_unset_lock(&openListLock);
 				}
 			}
+
+			omp_set_lock(&closeListLock);
+			closedList[i][j] = true;
+			e++;
+			omp_unset_lock(&closeListLock);
+
+			// omp_set_lock(&openListLock);
+			// loopCondition = openList.size() != 0;
+			// omp_unset_lock(&openListLock);
 		}
 		printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
 
 	printf("The destination cell is found\n");	
 	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
-
-	// When the destination cell is not found and the open
-	// list is empty, then we conclude that we failed to
-	// reach the destination cell. This may happen when the
-	// there is no way to destination cell (due to
-	// blockages)
-	if (foundDest == false)
-		printf("Failed to find the Destination Cell\n");
 
 	return;
 }
