@@ -204,10 +204,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	#pragma omp parallel
 	{
-		int e=0;
 		// printf("Num threads:%d \n",omp_get_num_threads());
-		bool condition=true;
-		while (condition) {
+		while (!foundDest) {
 			pPair p;
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
@@ -217,18 +215,24 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 			// printf("here\n");
 			if(openList.size() == 0){
 				omp_unset_lock(&openListLock);
-				// #pragma omp barrier
-				// continue;
+				continue;
 			}
 			else  {
 				// printf("size %d\n", openList.size());
 				p = openList.top();
 				openList.pop();
+				i = p.second.first;
+				j = p.second.second;
+				omp_set_lock(&closeListLock);
+				if(closedList[i][j]){
+					omp_unset_lock(&closeListLock);
+					omp_unset_lock(&openListLock);
+					continue;
+				}
+				closedList[i][j]=true;
+				omp_unset_lock(&closeListLock);
 				omp_unset_lock(&openListLock);
 
-				// Add this vertex to the closed list
-		
-				// printf("Thread worked on %d, Elements worked on:%d \n",omp_get_thread_num(),e);
 				/*	
 				Generating all the 4 successor of this cell
 				Cell-->Popped Cell (i, j)
@@ -264,8 +268,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 							cellDetails[x][y].parent_i = i;
 							cellDetails[x][y].parent_j = j;
 							foundDest = true;
-							// printf("The destination cell is found\n");
-							// notDone=false;
 						}
 						if (isUnBlocked(map, x, y, dim_y) == true) {
 							omp_set_lock(&openListLock);
@@ -292,19 +294,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						}
 					}
 				}
-
-				omp_set_lock(&closeListLock);
-				closedList[i][j] = true;
-				e++;
-				omp_unset_lock(&closeListLock);
 			}
-
-			// #pragma omp barrier
-
-			omp_set_lock(&openListLock);
-			condition = (openList.size() != 0) || !foundDest;
-			omp_unset_lock(&openListLock);
-			// #pragma omp barrier
 		}
 		printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
