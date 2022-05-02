@@ -275,7 +275,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// printf("The destination cell is found\n");
 						// notDone=false;
 					}
-					if (isUnBlocked(map, i, j, dim_y) == true) {
+					if (isUnBlocked(map, x, y, dim_y) == true) {
 						omp_set_lock(&openListLock);
 						omp_set_lock(&closeListLock);
 						omp_set_lock(&cellLock);

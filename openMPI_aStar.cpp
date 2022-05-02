@@ -16,6 +16,7 @@
 #include <bits/stdc++.h>
 #include <chrono>
 #include <time.h>
+#include <numeric> 
 #include <sys/time.h>
 #include "mpi.h"
 
@@ -107,7 +108,7 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 	return;
 }
 
-void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair> *openList, cell cellToSend, cell *cellDetails) {
+void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair> *openList, bool *closedList, cell cellToSend, cell *cellDetails) {
 	int x = pairToSend.second.first;
 	int y = pairToSend.second.second;
 	int index = x*dim_x + y;
@@ -117,9 +118,16 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 	 MPI_Request request = MPI_REQUEST_NULL;
 
 	if (indexToSend == procID) {
-		openList->push(pairToSend);
-		// Update the details of this cell
-		cellDetails[x*dim_x+y] = cellToSend;
+		if (!closedList[x*dim_x+y]) {
+			if (cellDetails[x*dim_x+y].f == INT_MAX || cellDetails[x*dim_x+y].f > pairToSend.first) {
+				openList->push(pairToSend);
+				cellDetails[x*dim_x+y] = cellToSend;
+			}	
+        }
+		if (procID != 0) {
+			MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+			MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+		}
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
@@ -214,9 +222,9 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 	bool localFoundDest = false;
 
 	MPI_Request request = MPI_REQUEST_NULL;
+	bool emptyBool[nproc];
 
 	while (true) {
-
 		//During each iteration, check for data messages from other nodes
 		for (int node = 0; node < nproc; node++)
 		{
@@ -236,14 +244,22 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 					int tmpy = tmpPair.second.second;
 					int tmpindex = tmpx*dim_x + tmpy;
 
-					int tmpindexToSend = tmpindex % nproc;
-					if (tmpindexToSend == procID && !closedList[tmpx][tmpy]) {
-						openList.push(tmpPair);
+					if (procID == 0) {
+						printf("this is thread %d im receiving node %d, %d\n", procID, tmpx, tmpy);
 					}
+
+					int tmpindexToSend = tmpindex % nproc;
 					MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
-					// if (!closedList[tmpx][tmpy]) {
-						cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
-					// }
+
+					// Check whether this node belongs to us
+					if (tmpindexToSend == procID) {
+						if (!closedList[tmpx][tmpy]) {
+							if (cellDetails[tmpx][tmpy].f == INT_MAX || cellDetails[tmpx][tmpy].f > tmpPair.first) {
+								openList.push(tmpPair);
+								cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
+							}	
+                    	}
+					}
 					// printf("data being recieved");
 					MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
 					MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
@@ -258,8 +274,15 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 			}
 		}
 
-		if (openList.size() == 0 && foundDest) {
-			break;
+		if (foundDest) {
+			MPI_Barrier(MPI_COMM_WORLD);
+			emptyBool[procID] = openList.size() == 0;
+			MPI_Allgather((void*)(&emptyBool[procID]), 1, MPI_BYTE, (void*)emptyBool, 1, MPI_BYTE, MPI_COMM_WORLD);
+			MPI_Barrier(MPI_COMM_WORLD);
+			int sum = std::accumulate(emptyBool, emptyBool + nproc, 0);
+			if (sum == nproc) {
+				break;
+			}
 		}
 
 		if (openList.size() == 0) {
@@ -280,7 +303,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 		// j = p.second.second;
 		// closedList[i][j] = true;
 
-		printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
+		// printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
 
 		/*
 		Generating all the 4 successor of this cell
@@ -330,22 +353,17 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 							MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
 						}
 					}
-                    break;
+                    continue;
                 }
-                else if (isUnBlocked(map, i, j, dim_x) == true) {
+                else if (isUnBlocked(map, x, y, dim_x) == true) {
                     gNew = cellDetails[i][j].g + 1.0;
                     hNew = calculateHValue(x, y, dest);
                     fNew = gNew + hNew;
 
-                    if (cellDetails[x][y].f == INT_MAX
-                        || cellDetails[x][y].f > fNew) {
-
-						pPair pairToSend = make_pair(fNew, make_pair(x, y));
-						cell cellToSend = {i, j, fNew, gNew, hNew};
-						// cellDetails[x][y] = cellToSend;
+					pPair pairToSend = make_pair(fNew, make_pair(x, y));
+					cell cellToSend = {i, j, fNew, gNew, hNew};
 			
-						hashedSendFunction(pairToSend, dim_y, nproc, procID, &openList, cellToSend, (cell*)(&cellDetails));
-                    }
+					hashedSendFunction(pairToSend, dim_y, nproc, procID, &openList, (bool*)(&closedList), cellToSend, (cell*)(&cellDetails));
                 }
             }
 
@@ -430,7 +448,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 				MPI_Irecv((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
 			}
 		}
-		// cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);

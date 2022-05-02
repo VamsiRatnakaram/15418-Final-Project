@@ -235,7 +235,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                     foundDest = true;
                     continue;
                 }
-                else if (isUnBlocked(map, i, j, dim_y) == true) {
+                else if (isUnBlocked(map, x, y, dim_y) == true) {
                     gNew = cellDetails[i][j].g + 1.0;
                     hNew = calculateHValue(x, y, dest);
                     fNew = gNew + hNew;
