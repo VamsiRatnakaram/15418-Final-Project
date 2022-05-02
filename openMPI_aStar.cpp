@@ -241,9 +241,9 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 						openList.push(tmpPair);
 					}
 					MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
-					if (!closedList[tmpx][tmpy]) {
+					// if (!closedList[tmpx][tmpy]) {
 						cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
-					}
+					// }
 					// printf("data being recieved");
 					MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
 					MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);

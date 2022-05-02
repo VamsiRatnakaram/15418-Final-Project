@@ -195,7 +195,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
-	// bool foundDest = false;
+	bool foundDest = false;
 
 	omp_lock_t openListLock, closeListLock,cellLock;
 	omp_init_lock(&closeListLock); //cas
@@ -206,8 +206,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	{
 		int e=0;
 		// printf("Num threads:%d \n",omp_get_num_threads());
-		bool loopCondition = true;
-		while (/*!foundDest &&*/ loopCondition) {
+		bool condition=true;
+		while (condition) {
 			pPair p;
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
@@ -217,15 +217,18 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 			// printf("here\n");
 			if(openList.size() == 0){
 				omp_unset_lock(&openListLock);
-				continue;
+				// #pragma omp barrier
+				// continue;
 			}
+			else  {
+			// printf("size %d\n", openList.size());
 			p = openList.top();
 			openList.pop();
 			omp_unset_lock(&openListLock);
+
 			// Add this vertex to the closed list
 			i = p.second.first;
 			j = p.second.second;
-
 			omp_set_lock(&closeListLock);
 			if(closedList[i][j]){
 				omp_unset_lock(&closeListLock);
@@ -241,7 +244,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 			S --> South	 (i+1, j)
 			E --> East	 (i, j+1)
 			W --> West   (i, j-1)*/
-			bool notDone=true;
 			for (z = 0; z < 4; z++) {
 				// Only process this cell if this is a valid one
 				// int x, y;
@@ -269,19 +271,19 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// Set the Parent of the destination cell
 						cellDetails[x][y].parent_i = i;
 						cellDetails[x][y].parent_j = j;
-						// foundDest = true;
-						notDone=false;
+						foundDest = true;
+						// printf("The destination cell is found\n");
+						// notDone=false;
 					}
-					omp_set_lock(&openListLock);
-					omp_set_lock(&closeListLock);
-					omp_set_lock(&cellLock);
-					if (isUnBlocked(map, i, j, dim_y) == true && notDone) {
+					if (isUnBlocked(map, i, j, dim_y) == true) {
+						omp_set_lock(&openListLock);
+						omp_set_lock(&closeListLock);
+						omp_set_lock(&cellLock);
 						gNew = cellDetails[i][j].g + 1.0;
 						hNew = calculateHValue(x, y, dest);
 						fNew = gNew + hNew;
 
-						if (cellDetails[x][y].f == INT_MAX
-							|| cellDetails[x][y].f > fNew) {
+						if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > fNew) {
 							
 							openList.push(make_pair(fNew, make_pair(x, y)));
 
@@ -292,10 +294,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 							cellDetails[x][y].parent_i = i;
 							cellDetails[x][y].parent_j = j;
 						}
+						omp_unset_lock(&cellLock);
+						omp_unset_lock(&closeListLock);
+						omp_unset_lock(&openListLock);
 					}
-					omp_unset_lock(&cellLock);
-					omp_unset_lock(&closeListLock);
-					omp_unset_lock(&openListLock);
 				}
 			}
 
@@ -303,10 +305,14 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 			closedList[i][j] = true;
 			e++;
 			omp_unset_lock(&closeListLock);
+			}
 
-			// omp_set_lock(&openListLock);
-			// loopCondition = openList.size() != 0;
-			// omp_unset_lock(&openListLock);
+			// #pragma omp barrier
+
+			omp_set_lock(&openListLock);
+			condition = (openList.size() != 0) || !foundDest;
+			omp_unset_lock(&openListLock);
+			// #pragma omp barrier
 		}
 		printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}

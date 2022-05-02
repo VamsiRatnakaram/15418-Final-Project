@@ -181,12 +181,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	// We set this boolean value as false as initially
 	// the destination is not reached.
 	bool foundDest = false;
-
+	int e=0;
 	while (openList.size() != 0) {
-
-		if (foundDest && openList.size() == 0) {
-			break;
-		}
 
 		pPair p = openList.top();
         openList.pop();
@@ -239,8 +235,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                     foundDest = true;
                     continue;
                 }
-                else if (isUnBlocked(map, i, j, dim_y)
-                                == true) {
+                else if (isUnBlocked(map, i, j, dim_y) == true) {
                     gNew = cellDetails[i][j].g + 1.0;
                     hNew = calculateHValue(x, y, dest);
                     fNew = gNew + hNew;
@@ -262,7 +257,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
         }
 
 		closedList[i][j] = true;
+		e++;
 	}
+
+	printf("elements worked on:%d\n",e);
 
 	printf("The destination cell is found\n");
 	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
