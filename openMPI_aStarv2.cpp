@@ -89,6 +89,7 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 	stack<Pair> Path;
 
     // printf("%d, %d \n", cellDetails[row*dim_y + col].parent_i, cellDetails[row*dim_y + col].parent_j);
+    // printf("row: %d col: %d", row, col);
 
 	while (!(cellDetails[row*dim_y + col].parent_i == row
 			&& cellDetails[row*dim_y + col].parent_j == col)) {
@@ -97,6 +98,7 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 		int temp_col = cellDetails[row*dim_y + col].parent_j;
 		row = temp_row;
 		col = temp_col;
+        // printf("row: %d col: %d", row, col);
 	}
 
 	Path.push(make_pair(row, col));
@@ -105,6 +107,7 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 		Path.pop();
 		printf("-> (%d,%d) ", p.first, p.second);
 	}
+    printf("\n");
 
 	return;
 }
@@ -219,7 +222,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 	// We set this boolean value as false as initially
 	// the destination is not reached.
     MPI_Request request = MPI_REQUEST_NULL;
-	bool foundDest = false;
     bool localFoundDest = false;
 	int e=0;
     int conditionFlag = true;
@@ -232,9 +234,9 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
             // Add this vertex to the closed list
             i = p.second.first;
             j = p.second.second;
-            if (closedList[i][j]) {
-                continue;
-            }
+            // if (closedList[i][j]) {
+            //     continue;
+            // }
 
             /*
             Generating all the 4 successor of this cell
@@ -270,20 +272,22 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
                 if (isValid(x, y, dim_x, dim_y) == true) {
                     // If the destination cell is the same as the
                     // current successor
-                    if (isDestination(x, y, dest) == true) {
-                        // Set the Parent of the destination cell
-                        cellDetails[x][y].parent_i = i;
-                        cellDetails[x][y].parent_j = j;
-                        foundDest = true;
-                        localFoundDest = true;
-                        for (int node = 0; node < nproc; node++) {
-                            if (node != procID) {
-                                MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-                            }
-                        }
-                        continue;
-                    }
-                    else if (isUnBlocked(map, x, y, dim_y) == true) {
+                    // if (isDestination(x, y, dest) == true) {
+                    //     // Set the Parent of the destination cell
+                    //     cellDetails[x][y].parent_i = i;
+                    //     cellDetails[x][y].parent_j = j;
+
+                    //     hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, (cell*)cellDetails);
+                    //     localFoundDest = true;
+                    //     // for (int node = 0; node < nproc; node++) {
+                    //     //     if (node != procID) {
+                    //     //         MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                    //     //     }
+                    //     // }
+                    //     continue;
+                    // }
+                    // else 
+                    if (isUnBlocked(map, x, y, dim_y) == true) {
                         gNew = cellDetails[i][j].g + 1.0;
                         hNew = calculateHValue(x, y, dest);
                         fNew = gNew + hNew;
@@ -304,7 +308,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
                 }
             }
 
-            closedList[i][j] = true;
+            // closedList[i][j] = true;
             e++;
         }
         else {
@@ -352,7 +356,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
                     MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
                     while (flag_done)
                     {
-                        MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                        // MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
 
                         MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
                     }
@@ -371,31 +375,51 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 
 	printf("elements worked on:%d\n",e);
 
-    if (localFoundDest) {
+    MPI_Status status;
+
+    if (localFoundDest && procID != 0) {
+        printf("thread %d found the dest\n", procID);
 		MPI_Isend((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+        MPI_Wait(&request, &status);
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	if (procID == 0) {
+	if (procID == 0 && !localFoundDest) {
 		for (int node = 0; node < nproc; node++) {
 			int flag = 0;
 			MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
 			if (flag) {
 				MPI_Irecv((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, &status);
 			}
 		}
 	}
+	MPI_Wait(&request, &status);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
     if (procID == 0) {
+        printf("this is proc 0's data\n");
 		for (int a = 0; a < dim_y; a++) {
 			for (int b = 0; b < dim_x; b++) {
-				printf("%d %d \n", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
+				printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
 			}
+            printf("\n");
 		}
 	}
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (procID == 1) {
+        printf("this is proc 1's data\n");
+		for (int a = 0; a < dim_y; a++) {
+			for (int b = 0; b < dim_x; b++) {
+				printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
+			}
+            printf("\n");
+		}
+	}
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     if (procID == 0) {
         printf("The destination cell is found\n");
@@ -407,8 +431,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 	// reach the destination cell. This may happen when the
 	// there is no way to destination cell (due to
 	// blockages)
-	if (foundDest == false)
-		printf("Failed to find the Destination Cell\n");
+	// if (foundDest == false)
+	// 	printf("Failed to find the Destination Cell\n");
 
 	return;
 }
