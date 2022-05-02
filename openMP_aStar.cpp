@@ -227,14 +227,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 				omp_unset_lock(&openListLock);
 
 				// Add this vertex to the closed list
-				i = p.second.first;
-				j = p.second.second;
-				omp_set_lock(&closeListLock);
-				if(closedList[i][j]){
-					omp_unset_lock(&closeListLock);
-					continue;
-				}
-				omp_unset_lock(&closeListLock);
 		
 				// printf("Thread worked on %d, Elements worked on:%d \n",omp_get_thread_num(),e);
 				/*	
