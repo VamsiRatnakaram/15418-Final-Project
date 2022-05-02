@@ -16,11 +16,10 @@
 #include <bits/stdc++.h>
 #include <chrono>
 #include <time.h>
-#include <numeric> 
 #include <sys/time.h>
-#include "mpi.h"
+#include <mpi.h>
 
-#define BILLION  1E9
+#define BILLION  1E9;
 
 #define TAG_CELL 3
 #define TAG_DATA 2
@@ -29,6 +28,8 @@
 // #include "CycleTimer.h"
 using namespace std::chrono;
 
+// A C++ Program to implement A* Search Algorithm
+// Note: We adpated an existing sequential implementation from www.geeksforgeeks.org
 using namespace std;
 
 // Creating a shortcut for int, int pair type
@@ -87,6 +88,8 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 
 	stack<Pair> Path;
 
+    // printf("%d, %d \n", cellDetails[row*dim_y + col].parent_i, cellDetails[row*dim_y + col].parent_j);
+
 	while (!(cellDetails[row*dim_y + col].parent_i == row
 			&& cellDetails[row*dim_y + col].parent_j == col)) {
 		Path.push(make_pair(row, col));
@@ -103,8 +106,6 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 		printf("-> (%d,%d) ", p.first, p.second);
 	}
 
-	printf("\n");
-
 	return;
 }
 
@@ -115,27 +116,25 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 
 	int indexToSend = index % nproc;
 
-	 MPI_Request request = MPI_REQUEST_NULL;
+	MPI_Request request = MPI_REQUEST_NULL;
 
 	if (indexToSend == procID) {
-		if (!closedList[x*dim_x+y]) {
-			if (cellDetails[x*dim_x+y].f == INT_MAX || cellDetails[x*dim_x+y].f > pairToSend.first) {
-				openList->push(pairToSend);
-				cellDetails[x*dim_x+y] = cellToSend;
-			}	
+        if (cellDetails[x*dim_x + y].f == INT_MAX || cellDetails[x*dim_x + y].f > pairToSend.first) {
+            openList->push(pairToSend);
+            cellDetails[x*dim_x + y] = cellToSend;
         }
-		if (procID != 0) {
-			MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-			MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-		}
+        if (procID != 0) {
+            MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+		    MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+        }
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
 		MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, indexToSend, TAG_CELL, MPI_COMM_WORLD, &request);
-		if (procID != 0) {
-			MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-			MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-		}
+        if (procID != 0) {
+            MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+		    MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+        }
 	}
 }
 
@@ -193,6 +192,14 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 		}
 	}
 
+	// Initialising the parameters of the starting node
+	i = src.first, j = src.second;
+	cellDetails[i][j].f = 0.0;
+	cellDetails[i][j].g = 0.0;
+	cellDetails[i][j].h = 0.0;
+	cellDetails[i][j].parent_i = i;
+	cellDetails[i][j].parent_j = j;
+
 	/*
 	Create an priority queue having information as-
 	<f, <i, j>>
@@ -205,80 +212,153 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
-	if (procID == 0) {
-		// Initialising the parameters of the starting node
-		i = src.first, j = src.second;
-		cellDetails[i][j].f = 0.0;
-		cellDetails[i][j].g = 0.0;
-		cellDetails[i][j].h = 0.0;
-		cellDetails[i][j].parent_i = i;
-		cellDetails[i][j].parent_j = j;
-		openList.push(make_pair(0.0, make_pair(i, j)));
-	}
+    if (procID == 0) {
+        openList.push(make_pair(0.0, make_pair(i, j)));
+    }
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
+    MPI_Request request = MPI_REQUEST_NULL;
 	bool foundDest = false;
-	bool localFoundDest = false;
+    bool localFoundDest = false;
+	int e=0;
+    int conditionFlag = true;
+    bool emptyBool[nproc];
+	while (conditionFlag /*openList.size() != 0*/) {
+        if (openList.size() != 0) {
+            pPair p = openList.top();
+            openList.pop();
 
-	MPI_Request request = MPI_REQUEST_NULL;
-	bool emptyBool[nproc];
+            // Add this vertex to the closed list
+            i = p.second.first;
+            j = p.second.second;
+            if (closedList[i][j]) {
+                continue;
+            }
 
-	while (openList.size() != 0) {
-		//During each iteration, check for data messages from other nodes
-		for (int node = 0; node < nproc; node++)
-		{
-			pPair tmpPair;
-			cell tmpCell;
-			int flag_data = 0;
-			int flag_done = 0;
-			int flag_cell = 0;
-			if (node != procID)
-			{	
-				MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
-				MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
-				while (flag_data && flag_cell)
-				{
-					MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
-					int tmpx = tmpPair.second.first;
-					int tmpy = tmpPair.second.second;
-					int tmpindex = tmpx*dim_x + tmpy;
+            /*
+            Generating all the 4 successor of this cell
+            Cell-->Popped Cell (i, j)
+            N --> North	 (i-1, j)
+            S --> South	 (i+1, j)
+            E --> East	 (i, j+1)
+            W --> West   (i, j-1)*/
 
-					if (procID == 0) {
-						printf("this is thread %d im receiving node %d, %d\n", procID, tmpx, tmpy);
-					}
+            // To store the 'g', 'h' and 'f' of the 4 successors
+            double gNew, hNew, fNew;
 
-					int tmpindexToSend = tmpindex % nproc;
-					MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+            for (int z = 0; z < 4; z++) {
+                // Only process this cell if this is a valid one
+                int x, y;
+                if (z==0) {
+                    x = i-1;
+                    y = j;
+                }
+                else if (z==1) {
+                    x = i+1;
+                    y = j;
+                }
+                else if (z==2) {
+                    x = i;
+                    y = j+1;
+                }
+                else {
+                    x = i;
+                    y = j-1;
+                }
+                
+                if (isValid(x, y, dim_x, dim_y) == true) {
+                    // If the destination cell is the same as the
+                    // current successor
+                    if (isDestination(x, y, dest) == true) {
+                        // Set the Parent of the destination cell
+                        cellDetails[x][y].parent_i = i;
+                        cellDetails[x][y].parent_j = j;
+                        foundDest = true;
+                        localFoundDest = true;
+                        for (int node = 0; node < nproc; node++) {
+                            if (node != procID) {
+                                MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                            }
+                        }
+                        continue;
+                    }
+                    else if (isUnBlocked(map, x, y, dim_y) == true) {
+                        gNew = cellDetails[i][j].g + 1.0;
+                        hNew = calculateHValue(x, y, dest);
+                        fNew = gNew + hNew;
 
-					// Check whether this node belongs to us
-					if (tmpindexToSend == procID || procID == 0) {
-						if (!closedList[tmpx][tmpy]) {
-							if (cellDetails[tmpx][tmpy].f == INT_MAX || cellDetails[tmpx][tmpy].f > tmpPair.first) {
-								openList.push(tmpPair);
-								cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
-								// if (procID == 0) {
-								// 	closedList[tmpx][tmpy] = true;
-								// }
-							}	
-                    	}
-					}
-					// printf("data being recieved");
-					MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
-					MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
-				}
-				MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-				while (flag_done)
-				{
-					MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-					// printf("recieved\n");
-					MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-				}
-			}
-		}
+                        pPair pairToSend = make_pair(fNew, make_pair(x, y));
+                        cell cellToSend;
+                        
+                        // Update the details of this cell
+                        cellToSend.f = fNew;
+                        cellToSend.g = gNew;
+                        cellToSend.h = hNew;
+                        cellToSend.parent_i = i;
+                        cellToSend.parent_j = j;
 
-		if (foundDest) {
-			MPI_Barrier(MPI_COMM_WORLD);
+
+                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, (cell*)cellDetails);
+                    }
+                }
+            }
+
+            closedList[i][j] = true;
+            e++;
+        }
+        else {
+            MPI_Barrier(MPI_COMM_WORLD);
+            //During each iteration, check for data messages from other nodes
+            for (int node = 0; node < nproc; node++)
+            {
+                pPair tmpPair;
+                cell tmpCell;
+                int flag_data = 0;
+                int flag_done = 0;
+                int flag_cell = 0;
+                if (node != procID)
+                {	
+                    MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+                    MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+                    while (flag_data && flag_cell)
+                    {
+                        MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                        MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+
+                        int x = tmpPair.second.first;
+                        int y = tmpPair.second.second;
+                        int index = x*dim_x + y;
+
+                        int indexToSend = index % nproc;
+
+                        if (indexToSend == procID) {
+                            if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > tmpPair.first) {
+                                openList.push(tmpPair);
+                                cellDetails[x][y] = tmpCell;
+                            }
+                        }
+
+                        // Root should recieve all nodes
+                        if (0 == procID) {
+                            if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > tmpPair.first) {
+                                cellDetails[x][y] = tmpCell;
+                            }
+                        }
+
+                        MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+                        MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+                    }
+                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    while (flag_done)
+                    {
+                        MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+
+                        MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    }
+                }
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
 			emptyBool[procID] = openList.size() == 0;
 			MPI_Allgather((void*)(&emptyBool[procID]), 1, MPI_BYTE, (void*)emptyBool, 1, MPI_BYTE, MPI_COMM_WORLD);
 			MPI_Barrier(MPI_COMM_WORLD);
@@ -286,158 +366,16 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 			if (sum == nproc) {
 				break;
 			}
-		}
-
-		if (openList.size() == 0) {
-			continue;
-		}
-
-		pPair p = openList.top();
-        openList.pop();
-
-		i = p.second.first;
-		j = p.second.second;
-
-		// printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
-
-		/*
-		Generating all the 4 successor of this cell
-		Cell-->Popped Cell (i, j)
-		N --> North	 (i-1, j)
-		S --> South	 (i+1, j)
-		E --> East	 (i, j+1)
-		W --> West   (i, j-1)*/
-
-		// To store the 'g', 'h' and 'f' of the 4 successors
-		double gNew, hNew, fNew;
-
-		for (int z = 0; z < 4; z++) {
-            // Only process this cell if this is a valid one
-            int x, y;
-            if (z==0) {
-                x = i-1;
-                y = j;
-            }
-            else if (z==1) {
-                x = i+1;
-                y = j;
-            }
-            else if (z==2) {
-                x = i;
-                y = j+1;
-            }
-            else {
-                x = i;
-                y = j-1;
-            }
-
-			if (closedList[x][y]) {
-				continue;
-			}
-            
-		    if (isValid(x, y, dim_x, dim_y) == true) {
-                // If the destination cell is the same as the
-                // current successor
-                if (isDestination(x, y, dest) == true) {
-                    // Set the Parent of the destination cell
-                    cellDetails[x][y].parent_i = i;
-                    cellDetails[x][y].parent_j = j;
-                    printf("The destination cell is found by thread %d\n", procID);
-                    // tracePath((cell*)((void*)&cellDetails), dest, dim_x);
-                    foundDest = true;
-					localFoundDest = true;
-					printf("past Trace\n");
-					for (int node = 0; node < nproc; node++) {
-						if (node != procID) {
-							MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-						}
-					}
-                    continue;
-                }
-                else if (isUnBlocked(map, x, y, dim_x) == true) {
-                    gNew = cellDetails[i][j].g + 1.0;
-                    hNew = calculateHValue(x, y, dest);
-                    fNew = gNew + hNew;
-
-					pPair pairToSend = make_pair(fNew, make_pair(x, y));
-					cell cellToSend = {i, j, fNew, gNew, hNew};
-			
-					hashedSendFunction(pairToSend, dim_y, nproc, procID, &openList, (bool*)(&closedList), cellToSend, (cell*)(&cellDetails));
-                }
-            }
-
-			// Add this vertex to the closed list
-			closedList[x][y] = true;
-
-			// IDK if this necessary
-			// MPI_Status status;
-			// MPI_Wait(&request, &status);
-        }
+        }	
 	}
 
-	printf("hi thread %d is at the barrier\n", procID);
+	printf("elements worked on:%d\n",e);
 
-
-	// /* Create a datatype to receive into. */
-	// MPI_Type_vector( NUM_LOCAL_ELE, /* # of blocks */
-	// 1, /* # of datatypes in a block (one for this
-	// array) */
-	// gsize, /* Stride between successive blocks */
-	// MPI_CHAR, /* Type of each block */
-	// &old_type);
-	// MPI_Type_commit( &old_type);
-
-	// /* Resize the type to allow interleaving,
-	// * so make it only one MPI_CHAR wide
-	// */
-	// MPI_Type_create_resized(old_type,
-	// 0, /* Lower Bound */
-	// 1, /* Uppoer Bound change to one block */
-	// &new_type);
-	// MPI_Type_commit( &new_type);
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	// //Node 0 should check for leftover messages
-	// if (procID == 0) {
-	// 	for (int node = 0; node < nproc; node++)
-	// 	{
-	// 		pPair tmpPair;
-	// 		cell tmpCell;
-	// 		int flag_data = 0;
-	// 		int flag_done = 0;
-	// 		int flag_cell = 0;
-	// 		if (node != procID)
-	// 		{	
-	// 			MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
-	// 			MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
-	// 			while (flag_data && flag_cell)
-	// 			{
-	// 				MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
-	// 				MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
-	// 				cellDetails[tmpPair.second.first][tmpPair.second.second] = tmpCell;
-	// 				printf("data being recieved");
-	// 				MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
-	// 				MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	if (localFoundDest) {
+    if (localFoundDest) {
 		MPI_Isend((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
-
-	// Put the starting cell on the open list and set its
-	// 'f' as 0
-	// if (procID == 0) {
-	// 	// Initialising the parameters of the starting node
-	// 	i = src.first, j = src.second;
-	// 	cellDetails[i][j].parent_i = i;
-	// 	cellDetails[i][j].parent_j = j;
-	// }
 
 	if (procID == 0) {
 		for (int node = 0; node < nproc; node++) {
@@ -451,7 +389,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (procID == 0) {
+    if (procID == 0) {
 		for (int a = 0; a < dim_y; a++) {
 			for (int b = 0; b < dim_x; b++) {
 				printf("%d %d \n", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
@@ -459,12 +397,10 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 		}
 	}
 
-	if (procID == 0) {
-		tracePath((cell*)((void*)&cellDetails), dest, dim_x);
-	}
-
-	// Call TracePath here from root and use a gather to collect the celldetails from all cells
-	// https://beowulf.beowulf.narkive.com/e6tVmOqX/mpi-programming-question-interleaved-mpi-gatherv
+    if (procID == 0) {
+        printf("The destination cell is found\n");
+	    tracePath((cell*)(cellDetails), dest, dim_y);
+    }
 
 	// When the destination cell is not found and the open
 	// list is empty, then we conclude that we failed to
@@ -540,18 +476,12 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
     // A* Sequential Algorithm
-	// Calculate time taken by a request
-	// struct timespec requestStart, requestEnd;
-	// clock_gettime(CLOCK_REALTIME, &requestStart);
     
     // StartTime after intialization
     double startTime = MPI_Wtime();
 	for (int i = 0; i < 1; i++) {
 		aStarSearch(map, src, dest, dim_x, dim_y, procID, nproc);
 	}
-	// clock_gettime(CLOCK_REALTIME, &requestEnd);
-	// Calculate time it took
-	// double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 
     // EndTime before I/O
     double endTime = MPI_Wtime();
