@@ -60,7 +60,7 @@ bool isValid(int row, int col, int dim_x, int dim_y)
 bool isUnBlocked(int *map, int row, int col, int dim_y)
 {
 	// Returns true if the cell is not blocked else false
-	return (map[row*dim_y + col] == 0);
+	return (map[col*dim_y + row] == 0);
 }
 
 // A Utility Function to check whether destination cell has
