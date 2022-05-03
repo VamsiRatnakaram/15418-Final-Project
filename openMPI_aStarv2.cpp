@@ -21,6 +21,9 @@
 
 #define BILLION  1E9;
 
+#define TAG_BOOL 6
+#define TAG_PAIR 5
+#define TAG_REQ  4
 #define TAG_CELL 3
 #define TAG_DATA 2
 #define TAG_DONE 1
@@ -78,41 +81,41 @@ double calculateHValue(int row, int col, Pair dest)
 	return abs(dest.second - col) + abs(dest.first - row);
 }
 
-// A Utility Function to trace the path from the source
-// to destination
-void tracePath(cell *cellDetails, Pair dest, int dim_y)
-{
-	printf("\nThe Path is ");
-	int row = dest.first;
-	int col = dest.second;
+// // A Utility Function to trace the path from the source
+// // to destination
+// void tracePath(cell *cellDetails, Pair dest, int dim_y)
+// {
+// 	printf("\nThe Path is ");
+// 	int row = dest.first;
+// 	int col = dest.second;
 
-	stack<Pair> Path;
+// 	stack<Pair> Path;
 
-    // printf("%d, %d \n", cellDetails[row*dim_y + col].parent_i, cellDetails[row*dim_y + col].parent_j);
-    // printf("row: %d col: %d", row, col);
+//     // printf("%d, %d \n", cellDetails[row*dim_y + col].parent_i, cellDetails[row*dim_y + col].parent_j);
+//     // printf("row: %d col: %d", row, col);
 
-	while (!(cellDetails[row*dim_y + col].parent_i == row
-			&& cellDetails[row*dim_y + col].parent_j == col)) {
-		Path.push(make_pair(row, col));
-		int temp_row = cellDetails[row*dim_y + col].parent_i;
-		int temp_col = cellDetails[row*dim_y + col].parent_j;
-		row = temp_row;
-		col = temp_col;
-        // printf("row: %d col: %d", row, col);
-	}
+// 	while (!(cellDetails[row*dim_y + col].parent_i == row
+// 			&& cellDetails[row*dim_y + col].parent_j == col)) {
+// 		Path.push(make_pair(row, col));
+// 		int temp_row = cellDetails[row*dim_y + col].parent_i;
+// 		int temp_col = cellDetails[row*dim_y + col].parent_j;
+// 		row = temp_row;
+// 		col = temp_col;
+//         // printf("row: %d col: %d", row, col);
+// 	}
 
-	Path.push(make_pair(row, col));
-	while (!Path.empty()) {
-		pair<int, int> p = Path.top();
-		Path.pop();
-		printf("-> (%d,%d) ", p.first, p.second);
-	}
-    printf("\n");
+// 	Path.push(make_pair(row, col));
+// 	while (!Path.empty()) {
+// 		pair<int, int> p = Path.top();
+// 		Path.pop();
+// 		printf("-> (%d,%d) ", p.first, p.second);
+// 	}
+//     printf("\n");
 
-	return;
-}
+// 	return;
+// }
 
-void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair> *openList, bool *closedList, cell cellToSend, cell *cellDetails) {
+void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair> *openList, bool *closedList, cell cellToSend, cell *cellDetails, int localDestCost) {
 	int x = pairToSend.second.first;
 	int y = pairToSend.second.second;
 	int index = x*dim_x + y;
@@ -120,24 +123,23 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 	int indexToSend = index % nproc;
 
 	MPI_Request request = MPI_REQUEST_NULL;
-
 	if (indexToSend == procID) {
-        if (cellDetails[x*dim_x + y].f == INT_MAX || cellDetails[x*dim_x + y].f > pairToSend.first) {
+        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > pairToSend.first && localDestCost > cellDetails[x*dim_x + y].f)) {
             openList->push(pairToSend);
             cellDetails[x*dim_x + y] = cellToSend;
         }
-        if (procID != 0) {
-            MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-		    MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-        }
+        // // if (p= 0) {
+        //     MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+		//     MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+        // }
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
 		MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, indexToSend, TAG_CELL, MPI_COMM_WORLD, &request);
-        if (procID != 0) {
-            MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-		    MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-        }
+        // if (procID != 0) {
+        //     MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+		//     MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
+        // }
 	}
 }
 
@@ -223,10 +225,12 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
 	// the destination is not reached.
     MPI_Request request = MPI_REQUEST_NULL;
     bool localFoundDest = false;
-	int e=0;
+    int localDestCost = INT_MAX;
+    bool foundDest = false;
     int conditionFlag = true;
+    pPair localDestVertex = make_pair(INT_MAX, make_pair(0,0));
     bool emptyBool[nproc];
-	while (conditionFlag /*openList.size() != 0*/) {
+	while (conditionFlag) {
         if (openList.size() != 0) {
             pPair p = openList.top();
             openList.pop();
@@ -234,10 +238,6 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
             // Add this vertex to the closed list
             i = p.second.first;
             j = p.second.second;
-            // if (closedList[i][j]) {
-            //     continue;
-            // }
-
             /*
             Generating all the 4 successor of this cell
             Cell-->Popped Cell (i, j)
@@ -245,6 +245,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
             S --> South	 (i+1, j)
             E --> East	 (i, j+1)
             W --> West   (i, j-1)*/
+
+            // printf("This is thread %d, I'm working on node %d, %d\n", procID, i, j);
 
             // To store the 'g', 'h' and 'f' of the 4 successors
             double gNew, hNew, fNew;
@@ -272,47 +274,43 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
                 if (isValid(x, y, dim_x, dim_y) == true) {
                     // If the destination cell is the same as the
                     // current successor
-                    // if (isDestination(x, y, dest) == true) {
-                    //     // Set the Parent of the destination cell
-                    //     cellDetails[x][y].parent_i = i;
-                    //     cellDetails[x][y].parent_j = j;
+                    if (isDestination(x, y, dest) == true) {
+                        localFoundDest = true;
+                        foundDest = true;
+                        //update if you have better path
+                        if (cellDetails[i][j].f < localDestCost) {
+                            localDestCost = cellDetails[i][j].f;
+                            // Set the Parent of the destination cell
+                            localDestVertex = make_pair(cellDetails[i][j].f, make_pair(i, j));
+                        }
 
-                    //     hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, (cell*)cellDetails);
-                    //     localFoundDest = true;
-                    //     // for (int node = 0; node < nproc; node++) {
-                    //     //     if (node != procID) {
-                    //     //         MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-                    //     //     }
-                    //     // }
-                    //     continue;
-                    // }
-                    // else 
-                    if (isUnBlocked(map, x, y, dim_y) == true) {
+                        for (int node = 0; node < nproc; node++) {
+                            if (node != procID) {
+                                MPI_Isend((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                            }
+                        }
+                        continue;
+                    } 
+                    else if (isUnBlocked(map, x, y, dim_y) == true) {
                         gNew = cellDetails[i][j].g + 1.0;
                         hNew = calculateHValue(x, y, dest);
                         fNew = gNew + hNew;
 
                         pPair pairToSend = make_pair(fNew, make_pair(x, y));
                         cell cellToSend;
-                        
                         // Update the details of this cell
                         cellToSend.f = fNew;
                         cellToSend.g = gNew;
                         cellToSend.h = hNew;
                         cellToSend.parent_i = i;
                         cellToSend.parent_j = j;
-
-
-                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, (cell*)cellDetails);
+                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, (cell*)cellDetails, localDestCost);        
                     }
                 }
             }
 
-            // closedList[i][j] = true;
-            e++;
         }
         else {
-            MPI_Barrier(MPI_COMM_WORLD);
             //During each iteration, check for data messages from other nodes
             for (int node = 0; node < nproc; node++)
             {
@@ -337,94 +335,170 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID
                         int indexToSend = index % nproc;
 
                         if (indexToSend == procID) {
-                            if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > tmpPair.first) {
+                            if (cellDetails[x][y].f == INT_MAX || (localDestCost > tmpPair.first && cellDetails[x][y].f > tmpPair.first)) {
                                 openList.push(tmpPair);
                                 cellDetails[x][y] = tmpCell;
                             }
                         }
 
-                        // Root should recieve all nodes
-                        if (0 == procID) {
-                            if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > tmpPair.first) {
-                                cellDetails[x][y] = tmpCell;
-                            }
-                        }
+                        // // Root should recieve all nodes
+                        // if (0 == procID) {
+                        //     if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > tmpPair.first) {
+                        //         cellDetails[x][y] = tmpCell;
+                        //     }
+                        // }
 
                         MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
                         MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
                     }
-                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-                    while (flag_done)
-                    {
-                        // MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
 
-                        MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    // Found Dest has been sent
+                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    if (flag_done){
+                        MPI_Irecv((void*)(&foundDest), 1, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
                     }
                 }
             }
-            MPI_Barrier(MPI_COMM_WORLD);
-			emptyBool[procID] = openList.size() == 0;
-			MPI_Allgather((void*)(&emptyBool[procID]), 1, MPI_BYTE, (void*)emptyBool, 1, MPI_BYTE, MPI_COMM_WORLD);
-			MPI_Barrier(MPI_COMM_WORLD);
-			int sum = std::accumulate(emptyBool, emptyBool + nproc, 0);
-			if (sum == nproc) {
-				break;
-			}
+            if (foundDest) {
+                MPI_Barrier(MPI_COMM_WORLD);
+                emptyBool[procID] = openList.size() == 0;
+                MPI_Allgather((void*)(&emptyBool[procID]), 1, MPI_BYTE, (void*)emptyBool, 1, MPI_BYTE, MPI_COMM_WORLD);
+                MPI_Barrier(MPI_COMM_WORLD);
+                int sum = std::accumulate(emptyBool, emptyBool + nproc, 0);
+                if (sum == nproc) {
+                    break;
+                }
+            }
         }	
-	}
+    }
 
-	printf("elements worked on:%d\n",e);
+    MPI_Barrier(MPI_COMM_WORLD);
+
 
     MPI_Status status;
 
-    if (localFoundDest && procID != 0) {
-        printf("thread %d found the dest\n", procID);
-		MPI_Isend((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-        MPI_Wait(&request, &status);
-	}
+    // printf("thread %d found the dest\n", procID);
+    // printf("localdest %d %d %d\n", procID, localDestVertex.second.first, localDestVertex.second.first);
+    if (localFoundDest) {
+        MPI_Isend((void*)(&localDestVertex), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
+    }
+    // MPI_Wait(&request, MPI_STATUS_IGNORE);
 
-	if (procID == 0 && !localFoundDest) {
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    pPair globalDestVertex;
+	if (procID == 0) {
+        if (localFoundDest) {
+            globalDestVertex = localDestVertex;
+        }
+        else {
+            globalDestVertex = make_pair(INT_MAX, make_pair(0,0));
+        }
 		for (int node = 0; node < nproc; node++) {
 			int flag = 0;
-			MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
+            pPair tmpVertex;
+			MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
 			if (flag) {
-				MPI_Irecv((void*)(&cellDetails[dest.first][dest.second]), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
-                MPI_Wait(&request, &status);
+				MPI_Irecv((void*)(&tmpVertex), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                // MPI_Wait(&request, MPI_STATUS_IGNORE);
+                if (tmpVertex.first < globalDestVertex.first || globalDestVertex.first == INT_MAX) {
+                    globalDestVertex.first = tmpVertex.first;
+                    globalDestVertex.second.first = tmpVertex.second.first;
+                    globalDestVertex.second.second = tmpVertex.second.second;
+                }
 			}
 		}
+        // cellDetails[dest.first][dest.second].parent_i = globalDestVertex.second.first;
+        // cellDetails[dest.first][dest.second].parent_j = globalDestVertex.second.second;
+        printf("global %d %d\n",globalDestVertex.second.first, globalDestVertex.second.second);
 	}
-	MPI_Wait(&request, &status);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-    if (procID == 0) {
-        printf("this is proc 0's data\n");
-		for (int a = 0; a < dim_y; a++) {
-			for (int b = 0; b < dim_x; b++) {
-				printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
-			}
-            printf("\n");
-		}
-	}
+    // if (procID == 0) {
+    //     printf("this is proc 0's data\n");
+	// 	for (int a = 0; a < dim_y; a++) {
+	// 		for (int b = 0; b < dim_x; b++) {
+	// 			printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
+	// 		}
+    //         printf("\n");
+	// 	}
+	// }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (procID == 1) {
-        printf("this is proc 1's data\n");
-		for (int a = 0; a < dim_y; a++) {
-			for (int b = 0; b < dim_x; b++) {
-				printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
-			}
-            printf("\n");
-		}
-	}
+    // if (procID == 1) {
+    //     printf("this is proc 1's data\n");
+	// 	for (int a = 0; a < dim_y; a++) {
+	// 		for (int b = 0; b < dim_x; b++) {
+	// 			printf("(%d %d) ", cellDetails[a][b].parent_i, cellDetails[a][b].parent_j);
+	// 		}
+    //         printf("\n");
+	// 	}
+	// }
 
     MPI_Barrier(MPI_COMM_WORLD);
+    bool traceDone = false;
 
     if (procID == 0) {
-        printf("The destination cell is found\n");
-	    tracePath((cell*)(cellDetails), dest, dim_y);
+        stack<Pair> Path;
+        Pair tmpPair = make_pair(dest.first, dest.second);
+        Path.push(tmpPair);
+        tmpPair = make_pair(globalDestVertex.second.first, globalDestVertex.second.second);
+	    
+        while(tmpPair.first != src.first || tmpPair.second != src.second) {
+            Path.push(tmpPair);
+
+            int ownerNode = (tmpPair.first*dim_y + tmpPair.second) % nproc;
+            if (ownerNode != procID) {
+                MPI_Send((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_REQ, MPI_COMM_WORLD);
+                // printf("0 sent\n");
+                MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_PAIR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                // printf("0 recieved\n");
+            }
+            else {
+                tmpPair = make_pair(cellDetails[tmpPair.first][tmpPair.second].parent_i, cellDetails[tmpPair.first][tmpPair.second].parent_j);
+            }
+        }
+        traceDone=true;
+        Path.push(tmpPair);
+
+        for (int node = 0; node < nproc; node++) {
+            if (node != procID) {
+                MPI_Isend((void*)(&traceDone), 1, MPI_BYTE, node, TAG_BOOL, MPI_COMM_WORLD, &request);
+            }
+        }
+
+        printf("\nThe Path is ");
+        while (!Path.empty()) {
+		    pair<int, int> p = Path.top();
+		    Path.pop();
+		    printf("-> (%d,%d) ", p.first, p.second);
+	    }
+        printf("\n");
     }
+
+    while (!traceDone) {
+        int flag;
+        int flag_done;
+        Pair tmpPair;
+        Pair parentPair;
+        MPI_Iprobe(0, TAG_BOOL, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+        if (flag_done) {
+            MPI_Irecv((void*)(&traceDone), 1, MPI_BYTE, 0, TAG_BOOL, MPI_COMM_WORLD, &request);
+        }
+
+        MPI_Iprobe(0, TAG_REQ, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
+		if (flag) {
+			MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, 0, TAG_REQ, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // printf("node %d recieved\n", procID);
+            parentPair = make_pair(cellDetails[tmpPair.first][tmpPair.second].parent_i, cellDetails[tmpPair.first][tmpPair.second].parent_j);
+            // printf("node %d sent\n", procID);
+            MPI_Send((void*)(&parentPair), 8, MPI_BYTE, 0, TAG_PAIR, MPI_COMM_WORLD);
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
 	// When the destination cell is not found and the open
 	// list is empty, then we conclude that we failed to
