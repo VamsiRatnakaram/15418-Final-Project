@@ -158,26 +158,27 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	// Declare a 2D array of structure to hold the details
 	// of that cell
-	cell cellDetails[dim_x][dim_y];
+	// cell cellDetails[dim_x][dim_y];
+	cell *cellDetails = (cell*)calloc(dim_x*dim_y, sizeof(cell));
 	int l, m;
 
 	for (l = 0; l < dim_y; l++) {
 		for (m = 0; m < dim_x; m++) {
-			cellDetails[l][m].f = INT_MAX;
-			cellDetails[l][m].g = INT_MAX;
-			cellDetails[l][m].h = INT_MAX;
-			cellDetails[l][m].parent_i = -1;
-			cellDetails[l][m].parent_j = -1;
+			cellDetails[l*dim_y+m].f = INT_MAX;
+			cellDetails[l*dim_y+m].g = INT_MAX;
+			cellDetails[l*dim_y+m].h = INT_MAX;
+			cellDetails[l*dim_y+m].parent_i = -1;
+			cellDetails[l*dim_y+m].parent_j = -1;
 		}
 	}
 
 	// Initialising the parameters of the starting node
 	l = src.first, m = src.second;
-	cellDetails[l][m].f = 0.0;
-	cellDetails[l][m].g = 0.0;
-	cellDetails[l][m].h = 0.0;
-	cellDetails[l][m].parent_i = l;
-	cellDetails[l][m].parent_j = m;
+	cellDetails[l*dim_y+m].f = 0.0;
+	cellDetails[l*dim_y+m].g = 0.0;
+	cellDetails[l*dim_y+m].h = 0.0;
+	cellDetails[l*dim_y+m].parent_i = l;
+	cellDetails[l*dim_y+m].parent_j = m;
 
 	/*
 	Create an priority queue having information as-
@@ -265,28 +266,28 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// current successor
 						if (isDestination(x, y, dest) == true) {
 							// Set the Parent of the destination cell
-							cellDetails[x][y].parent_i = i;
-							cellDetails[x][y].parent_j = j;
+							cellDetails[x*dim_y+y].parent_i = i;
+							cellDetails[x*dim_y+y].parent_j = j;
 							foundDest = true;
 						}
 						if (isUnBlocked(map, x, y, dim_y) == true) {
 							omp_set_lock(&openListLock);
 							omp_set_lock(&closeListLock);
 							omp_set_lock(&cellLock);
-							gNew = cellDetails[i][j].g + 1.0;
+							gNew = cellDetails[i*dim_y+j].g + 1.0;
 							hNew = calculateHValue(x, y, dest);
 							fNew = gNew + hNew;
 
-							if (cellDetails[x][y].f == INT_MAX || cellDetails[x][y].f > fNew) {
+							if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
 								
 								openList.push(make_pair(fNew, make_pair(x, y)));
 
 								// Update the details of this cell
-								cellDetails[x][y].f = fNew;
-								cellDetails[x][y].g = gNew;
-								cellDetails[x][y].h = hNew;
-								cellDetails[x][y].parent_i = i;
-								cellDetails[x][y].parent_j = j;
+								cellDetails[x*dim_y+y].f = fNew;
+								cellDetails[x*dim_y+y].g = gNew;
+								cellDetails[x*dim_y+y].h = hNew;
+								cellDetails[x*dim_y+y].parent_i = i;
+								cellDetails[x*dim_y+y].parent_j = j;
 							}
 							omp_unset_lock(&cellLock);
 							omp_unset_lock(&closeListLock);
@@ -300,40 +301,19 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	}
 
 	printf("The destination cell is found\n");	
-	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
+	tracePath(cellDetails, dest, dim_y);
 
 	return;
 }
 
 int main(int argc, const char *argv[]) {
     int numProc;
-    // int opt = 0;
 
 	_argc = argc - 1;
     _argv = argv + 1;
 
 	const char *inputFilename = get_option_string("-f", NULL);
     numProc = get_option_int("-p", 1);
-    
-    // // Read command line arguments
-    // do {
-    //     opt = getopt(argc, argv, "f:p");
-    //     switch (opt) {
-    //     case 'f':
-    //         inputFilename = optarg;
-    //         break;
-
-    //     case 'p':
-    //         numProc = atoi(optarg);
-    //         break;
-
-    //     case -1:
-    //         break;
-
-    //     default:
-    //         break;
-    //     }
-    // } while (opt != -1);
 
     if (inputFilename == NULL) {
         printf("Usage: %s -f <filename> [-p <P>] [-i <N_iters>]\n", argv[0]);
