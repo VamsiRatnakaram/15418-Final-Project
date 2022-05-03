@@ -4,7 +4,7 @@ import sys
 
 def main(size, filename):
     matrix = np.zeros((size, size))
-    matrix = [[(1 if np.random.rand() < 0.25 else x) for x in line] for line in matrix]
+    matrix = [[(1 if np.random.rand() < 0.2 else x) for x in line] for line in matrix]
 
     with open(filename, 'w+') as testfile:
         testfile.write('{} {}\n'.format(size, size))

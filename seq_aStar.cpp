@@ -142,27 +142,28 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 
 	// Declare a 2D array of structure to hold the details
 	// of that cell
-	cell cellDetails[dim_x][dim_y];
+	// cell cellDetails[dim_x][dim_y];
+	cell *cellDetails = (cell*)calloc(dim_x*dim_y, sizeof(cell));
 
 	int i, j;
 
 	for (i = 0; i < dim_y; i++) {
 		for (j = 0; j < dim_x; j++) {
-			cellDetails[i][j].f = INT_MAX;
-			cellDetails[i][j].g = INT_MAX;
-			cellDetails[i][j].h = INT_MAX;
-			cellDetails[i][j].parent_i = -1;
-			cellDetails[i][j].parent_j = -1;
+			cellDetails[i*dim_y+j].f = INT_MAX;
+			cellDetails[i*dim_y+j].g = INT_MAX;
+			cellDetails[i*dim_y+j].h = INT_MAX;
+			cellDetails[i*dim_y+j].parent_i = -1;
+			cellDetails[i*dim_y+j].parent_j = -1;
 		}
 	}
 
 	// Initialising the parameters of the starting node
 	i = src.first, j = src.second;
-	cellDetails[i][j].f = 0.0;
-	cellDetails[i][j].g = 0.0;
-	cellDetails[i][j].h = 0.0;
-	cellDetails[i][j].parent_i = i;
-	cellDetails[i][j].parent_j = j;
+	cellDetails[i*dim_y+j].f = 0.0;
+	cellDetails[i*dim_y+j].g = 0.0;
+	cellDetails[i*dim_y+j].h = 0.0;
+	cellDetails[i*dim_y+j].parent_i = i;
+	cellDetails[i*dim_y+j].parent_j = j;
 
 	/*
 	Create an priority queue having information as-
@@ -230,27 +231,27 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
                 // current successor
                 if (isDestination(x, y, dest) == true) {
                     // Set the Parent of the destination cell
-                    cellDetails[x][y].parent_i = i;
-                    cellDetails[x][y].parent_j = j;
+                    cellDetails[x*dim_y+y].parent_i = i;
+                    cellDetails[x*dim_y+y].parent_j = j;
                     foundDest = true;
                     continue;
                 }
                 else if (isUnBlocked(map, x, y, dim_y) == true) {
-                    gNew = cellDetails[i][j].g + 1.0;
+                    gNew = cellDetails[i*dim_y+j].g + 1.0;
                     hNew = calculateHValue(x, y, dest);
                     fNew = gNew + hNew;
 
-                    if (cellDetails[x][y].f == INT_MAX
-                        || cellDetails[x][y].f > fNew) {
+                    if (cellDetails[x*dim_y+y].f == INT_MAX
+                        || cellDetails[x*dim_y+y].f > fNew) {
                         openList.push(make_pair(
                             fNew, make_pair(x, y)));
 
                         // Update the details of this cell
-                        cellDetails[x][y].f = fNew;
-                        cellDetails[x][y].g = gNew;
-                        cellDetails[x][y].h = hNew;
-                        cellDetails[x][y].parent_i = i;
-                        cellDetails[x][y].parent_j = j;
+                        cellDetails[x*dim_y+y].f = fNew;
+                        cellDetails[x*dim_y+y].g = gNew;
+                        cellDetails[x*dim_y+y].h = hNew;
+                        cellDetails[x*dim_y+y].parent_i = i;
+                        cellDetails[x*dim_y+y].parent_j = j;
                     }
                 }
             }
@@ -263,7 +264,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	printf("elements worked on:%d\n",e);
 
 	printf("The destination cell is found\n");
-	tracePath((cell*)((void*)&cellDetails), dest, dim_y);
+	tracePath(cellDetails, dest, dim_y);
 
 	// When the destination cell is not found and the open
 	// list is empty, then we conclude that we failed to
