@@ -17,15 +17,31 @@
 #include <chrono>
 #include <time.h>
 #include <sys/time.h>
+#include <omp.h>
 
 #define BILLION  1E9;
 
 // #include "CycleTimer.h"
 using namespace std::chrono;
 
-// A C++ Program to implement A* Search Algorithm
-// Note: We adpated an existing sequential implementation from www.geeksforgeeks.org
 using namespace std;
+
+static int _argc;
+static const char **_argv;
+
+const char *get_option_string(const char *option_name, const char *default_value) {
+    for (int i = _argc - 2; i >= 0; i -= 2)
+        if (strcmp(_argv[i], option_name) == 0)
+            return _argv[i + 1];
+    return default_value;
+}
+
+int get_option_int(const char *option_name, int default_value) {
+    for (int i = _argc - 2; i >= 0; i -= 2)
+        if (strcmp(_argv[i], option_name) == 0)
+            return atoi(_argv[i + 1]);
+    return default_value;
+}
 
 // Creating a shortcut for int, int pair type
 typedef pair<int, int> Pair;
@@ -40,6 +56,7 @@ struct cell {
 	int parent_i, parent_j;
 	// f = g + h
 	double f, g, h;
+	omp_lock_t cell_lock
 };
 
 struct compare{
@@ -118,7 +135,7 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
     string rawname = baseS.substr(0, lastindex); 
 
     std::stringstream Output;
-    Output << "outputs//seq_" << rawname.c_str() << "_" << num_of_threads << ".txt";
+    Output << "outputs//openMP	_" << rawname.c_str() << "_" << num_of_threads << ".txt";
     std::string OutputFile = Output.str();
 
     const char *ocf = OutputFile.c_str();
@@ -166,7 +183,7 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
 // A Function to find the shortest path between
 // a given source cell to a destination cell according
 // to A* Search Algorithm
-double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const char *input_filename)
+double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int nproc, const char* input_filename)
 {
 	// Calculate time taken by a request
 	struct timespec requestStart, requestEnd;
@@ -204,31 +221,37 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const ch
 	// list is implemented as a boolean 2D array
 	bool closedList[dim_x][dim_y];
 	memset(closedList, false, sizeof(closedList));
+	omp_lock_t closedLocks[dim_x][dim_y];
+	for (l = 0; l < dim_y; l++) {
+		for (m = 0; m < dim_x; m++) {
+			omp_init_lock(&closedLocks[l][m]]);
+		}
+	}
 
 	// Declare a 2D array of structure to hold the details
 	// of that cell
 	// cell cellDetails[dim_x][dim_y];
 	cell *cellDetails = (cell*)calloc(dim_x*dim_y, sizeof(cell));
+	int l, m;
 
-	int i, j;
-
-	for (i = 0; i < dim_y; i++) {
-		for (j = 0; j < dim_x; j++) {
-			cellDetails[i*dim_y+j].f = INT_MAX;
-			cellDetails[i*dim_y+j].g = INT_MAX;
-			cellDetails[i*dim_y+j].h = INT_MAX;
-			cellDetails[i*dim_y+j].parent_i = -1;
-			cellDetails[i*dim_y+j].parent_j = -1;
+	for (l = 0; l < dim_y; l++) {
+		for (m = 0; m < dim_x; m++) {
+			cellDetails[l*dim_y+m].f = INT_MAX;
+			cellDetails[l*dim_y+m].g = INT_MAX;
+			cellDetails[l*dim_y+m].h = INT_MAX;
+			cellDetails[l*dim_y+m].parent_i = -1;
+			cellDetails[l*dim_y+m].parent_j = -1;
+			omp_init_lock(&(cellDetails[l*dim_y+m].cell_lock));
 		}
 	}
 
 	// Initialising the parameters of the starting node
-	i = src.first, j = src.second;
-	cellDetails[i*dim_y+j].f = 0.0;
-	cellDetails[i*dim_y+j].g = 0.0;
-	cellDetails[i*dim_y+j].h = 0.0;
-	cellDetails[i*dim_y+j].parent_i = i;
-	cellDetails[i*dim_y+j].parent_j = j;
+	l = src.first, m = src.second;
+	cellDetails[l*dim_y+m].f = 0.0;
+	cellDetails[l*dim_y+m].g = 0.0;
+	cellDetails[l*dim_y+m].h = 0.0;
+	cellDetails[l*dim_y+m].parent_i = l;
+	cellDetails[l*dim_y+m].parent_j = m;
 
 	/*
 	Create an priority queue having information as-
@@ -242,136 +265,134 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const ch
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
-	openList.push(make_pair(0.0, make_pair(i, j)));
+	openList.push(make_pair(0.0, make_pair(l, m)));
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
 	bool foundDest = false;
-	int e=0;
-	while (openList.size() != 0 && !foundDest) {
 
-		pPair p = openList.top();
-        openList.pop();
 
-		// Add this vertex to the closed list
-		i = p.second.first;
-		j = p.second.second;
-		if (closedList[i][j]) {
-			continue;
-		}
+	#pragma omp parallel
+	{
+		// printf("Num threads:%d \n",omp_get_num_threads());
+		while (!foundDest) {
+			pPair p;
+			int i, j, x, y, z;
+			// To store the 'g', 'h' and 'f' of the 4 successors
+			double gNew, hNew, fNew;
+			// printf("here\n");
+			omp_set_lock(&openListLock);
+			// printf("here\n");
+			if(openList.size() == 0){
+				omp_unset_lock(&openListLock);
+				continue;
+			}
+			else  {
+				// printf("size %d\n", openList.size());
+				p = openList.top();
+				openList.pop();
+				i = p.second.first;
+				j = p.second.second;
+				omp_set_lock(&closeLocks[i][j]);
+				if(closedList[i][j]){
+					omp_unset_lock(&closeListLock);
+					omp_unset_lock(&openListLock);
+					continue;
+				}
+				closedList[i][j]=true;
+				omp_unset_lock(&closeLocks[i][j]);
+				omp_unset_lock(&openListLock);
 
-		/*
-		Generating all the 4 successor of this cell
-		Cell-->Popped Cell (i, j)
-		N --> North	 (i-1, j)
-		S --> South	 (i+1, j)
-		E --> East	 (i, j+1)
-		W --> West   (i, j-1)*/
-
-		// To store the 'g', 'h' and 'f' of the 4 successors
-		double gNew, hNew, fNew;
-
-		for (int z = 0; z < 4; z++) {
-            // Only process this cell if this is a valid one
-            int x, y;
-            if (z==0) {
-                x = i-1;
-                y = j;
-            }
-            else if (z==1) {
-                x = i+1;
-                y = j;
-            }
-            else if (z==2) {
-                x = i;
-                y = j+1;
-            }
-            else {
-                x = i;
-                y = j-1;
-            }
-            
-		    if (isValid(x, y, dim_x, dim_y) == true) {
-                // If the destination cell is the same as the
-                // current successor
-                if (isDestination(x, y, dest) == true) {
-                    // Set the Parent of the destination cell
-                    cellDetails[x*dim_y+y].parent_i = i;
-                    cellDetails[x*dim_y+y].parent_j = j;
-                    foundDest = true;
-                    break;
-                }
-                else if (isUnBlocked(map, x, y, dim_y) == true) {
-                    gNew = cellDetails[i*dim_y+j].g + 1.0;
-                    hNew = calculateHValue(x, y, dest);
-                    fNew = gNew + hNew;
-
-                    if (cellDetails[x*dim_y+y].f == INT_MAX
+				/*	
+				Generating all the 4 successor of this cell
+				Cell-->Popped Cell (i, j)
+				N --> North	 (i-1, j)
+				S --> South	 (i+1, j)
+				E --> East	 (i, j+1)
+				W --> West   (i, j-1)*/
+				for (z = 0; z < 4; z++) {
+					// Only process this cell if this is a valid one
+					// int x, y;
+					if (z==0) {
+						x = i-1;
+						y = j;
+					}
+					else if (z==1) {
+						x = i+1;
+						y = j;
+					}
+					else if (z==2) {
+						x = i;
+						y = j+1;
+					}
+					else {
+						x = i;
+						y = j-1;
+					}
 					
-                        || cellDetails[x*dim_y+y].f > fNew) {
-                        openList.push(make_pair(
-                            fNew, make_pair(x, y)));
+					if (isValid(x, y, dim_x, dim_y) == true) {
+						// If the destination cell is the same as the
+						// current successor
+						if (isDestination(x, y, dest) == true) {
+							// Set the Parent of the destination cell
+							omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
+							cellDetails[x*dim_y+y].parent_i = i;
+							cellDetails[x*dim_y+y].parent_j = j;
+							omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
+							foundDest = true;
+						}
+						if (isUnBlocked(map, x, y, dim_y) == true) {
+							omp_set_lock(&openListLock);
+							omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
+							omp_set_lock(&closeLocks[x][y]);
+							gNew = cellDetails[i*dim_y+j].g + 1.0;
+							hNew = calculateHValue(x, y, dest);
+							fNew = gNew + hNew;
 
-                        // Update the details of this cell
-                        cellDetails[x*dim_y+y].f = fNew;
-                        cellDetails[x*dim_y+y].g = gNew;
-                        cellDetails[x*dim_y+y].h = hNew;
-                        cellDetails[x*dim_y+y].parent_i = i;
-                        cellDetails[x*dim_y+y].parent_j = j;
-                    }
-                }
-            }
-        }
+							if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
+								
+								if (!closedList[x][y]){
+									openList.push(make_pair(fNew, make_pair(x, y)));
+								} 
 
-		closedList[i][j] = true;
+								// Update the details of this cell
+								cellDetails[x*dim_y+y].f = fNew;
+								cellDetails[x*dim_y+y].g = gNew;
+								cellDetails[x*dim_y+y].h = hNew;
+								cellDetails[x*dim_y+y].parent_i = i;
+								cellDetails[x*dim_y+y].parent_j = j;
+							}
+							omp_unset_lock(&closeLocks[x][y]);
+							omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
+							omp_unset_lock(&openListLock);
+						}
+					}
+				}
+			}
+		}
+		// printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
 
-	printf("elements worked on:%d\n",e);
-
-	printf("The destination cell is found\n");
+	printf("The destination cell is found\n");	
 	tracePath(cellDetails, dest, dim_y);
 
 	clock_gettime(CLOCK_REALTIME, &requestEnd);
 	// Calculate time it took
 	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 
-	outputFile(input_filename, (bool*)closedList, cellDetails, dim_x, dim_y, 1, dest);
-
-	// When the destination cell is not found and the open
-	// list is empty, then we conclude that we failed to
-	// reach the destination cell. This may happen when the
-	// there is no way to destination cell (due to
-	// blockages)
-	if (foundDest == false)
-		printf("Failed to find the Destination Cell\n");
+	outputFile(input_filename, (bool*)closedList, cellDetails, dim_x, dim_y, nproc, dest);
 
 	return accum;
 }
 
-int main(int argc, char *argv[]) {
-    char *inputFilename = NULL;
+int main(int argc, const char *argv[]) {
     int numProc;
-    int opt = 0;
-    
-    // Read command line arguments
-    do {
-        opt = getopt(argc, argv, "f:p");
-        switch (opt) {
-        case 'f':
-            inputFilename = optarg;
-            break;
 
-        case 'p':
-            numProc = atof(optarg);
-            break;
+	_argc = argc - 1;
+    _argv = argv + 1;
 
-        case -1:
-            break;
-
-        default:
-            break;
-        }
-    } while (opt != -1);
+	const char *inputFilename = get_option_string("-f", NULL);
+    numProc = get_option_int("-p", 1);
 
     if (inputFilename == NULL) {
         printf("Usage: %s -f <filename> [-p <P>] [-i <N_iters>]\n", argv[0]);
@@ -386,7 +407,7 @@ int main(int argc, char *argv[]) {
     if (!input) {
         printf("Unable to open file: %s.\n", inputFilename);
         return -1;
-    }
+	}
 
     int dim_x, dim_y;
     fscanf(input, "%d %d\n", &dim_x, &dim_y);
@@ -405,16 +426,13 @@ int main(int argc, char *argv[]) {
 
     // A* Sequential Algorithm
 	double accum;
+	omp_set_num_threads(numProc);
 	for (int i = 0; i < 1; i++) {
-		accum = aStarSearch(map, src, dest, dim_x, dim_y, inputFilename);
+		accum = aStarSearch(map, src, dest, dim_x, dim_y, numProc, inputFilename);
 	}
 
 	printf("\n");
 	printf("Total Execution Time: %lf\n", accum);
-
-	fclose(input);
  
     return (0);
 }
-
-

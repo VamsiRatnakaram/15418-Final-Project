@@ -19,6 +19,8 @@
 #include <sys/time.h>
 #include <omp.h>
 
+#include "tmp/oneTBB/include/oneapi/tbb/concurrent_priority_queue.h"
+
 #define BILLION  1E9;
 
 // #include "CycleTimer.h"
@@ -56,6 +58,12 @@ struct cell {
 	int parent_i, parent_j;
 	// f = g + h
 	double f, g, h;
+};
+
+struct compare{
+    bool operator() (const pPair& p1,const pPair& p2 ){
+         return p1.first>p2.first;
+    }
 };
 
 // A Utility Function to check whether given cell (row, col)
@@ -118,21 +126,80 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 	return;
 }
 
+void outputFile(const char *input_filename, bool *closedList, cell *cellDetails, int dim_x, int dim_y, int num_of_threads, Pair dest) {
+	// File outputs
+	char resolved_path[PATH_MAX];
+    realpath(input_filename, resolved_path);
+    char *base = basename(resolved_path);
+    std::string baseS = std::string(base);
+    size_t lastindex = baseS.find_last_of("."); 
+    string rawname = baseS.substr(0, lastindex); 
+
+    std::stringstream Output;
+    Output << "outputs//openMP	_" << rawname.c_str() << "_" << num_of_threads << ".txt";
+    std::string OutputFile = Output.str();
+
+    const char *ocf = OutputFile.c_str();
+    FILE *outFile = fopen(ocf, "w+");
+    if (!outFile) {
+        printf("Unable to open file: %s.\n", ocf);
+        return;
+    }
+
+	fprintf(outFile, "%d %d \n", dim_x, dim_y);
+
+	for (int i = 0; i<dim_x; i++) {
+		for (int j = 0; j<dim_y; j++) {
+			fprintf(outFile, "%d ", closedList[i*dim_y +j]);
+		}
+		fprintf(outFile, "\n");
+	}
+	
+	int row = dest.first;
+	int col = dest.second;
+
+	stack<Pair> Path;
+
+	while (!(cellDetails[row*dim_y + col].parent_i == row
+			&& cellDetails[row*dim_y + col].parent_j == col)) {
+		Path.push(make_pair(row, col));
+		int temp_row = cellDetails[row*dim_y + col].parent_i;
+		int temp_col = cellDetails[row*dim_y + col].parent_j;
+		row = temp_row;
+		col = temp_col;
+	}
+
+	Path.push(make_pair(row, col));
+	while (!Path.empty()) {
+		pair<int, int> p = Path.top();
+		Path.pop();
+		fprintf(outFile, "%d %d \n", p.first, p.second);
+	}
+
+	fclose(outFile);
+
+	return;
+}
+
 // A Function to find the shortest path between
 // a given source cell to a destination cell according
 // to A* Search Algorithm
-void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
+double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int nproc, const char* input_filename)
 {
+	// Calculate time taken by a request
+	struct timespec requestStart, requestEnd;
+	clock_gettime(CLOCK_REALTIME, &requestStart);
+
 	// If the source is out of range
 	if (isValid(src.first, src.second, dim_x, dim_y) == false) {
 		printf("Source is invalid\n");
-		return;
+		return -1;
 	}
 
 	// If the destination is out of range
 	if (isValid(dest.first, dest.second, dim_x, dim_y) == false) {
 		printf("Destination is invalid\n");
-		return;
+		return -1;
 	}
 
 	// Either the source or the destination is blocked
@@ -140,14 +207,14 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 		|| isUnBlocked(map, dest.first, dest.second, dim_y)
 			== false) {
 		printf("Source or the destination is blocked\n");
-		return;
+		return -1;
 	}
 
 	// If the destination cell is the same as source cell
 	if (isDestination(src.first, src.second, dest)
 		== true) {
 		printf("We are already at the destination\n");
-		return;
+		return -1;
 	}
 
 	// Create a closed list and initialise it to false which
@@ -188,7 +255,7 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	Note that 0 <= i <= ROW-1 & 0 <= j <= COL-1
 	This open list is implemented as a set of pair of
 	pair.*/
-    std::priority_queue<pPair> openList;
+    std::priority_queue<pPair, vector<pPair>, compare> openList;
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
@@ -266,21 +333,25 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 						// current successor
 						if (isDestination(x, y, dest) == true) {
 							// Set the Parent of the destination cell
+							omp_set_lock(&cellLock);
 							cellDetails[x*dim_y+y].parent_i = i;
 							cellDetails[x*dim_y+y].parent_j = j;
+							omp_unset_lock(&cellLock);
 							foundDest = true;
 						}
 						if (isUnBlocked(map, x, y, dim_y) == true) {
 							omp_set_lock(&openListLock);
-							omp_set_lock(&closeListLock);
 							omp_set_lock(&cellLock);
+							omp_set_lock(&closeListLock);
 							gNew = cellDetails[i*dim_y+j].g + 1.0;
 							hNew = calculateHValue(x, y, dest);
 							fNew = gNew + hNew;
 
 							if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
 								
-								openList.push(make_pair(fNew, make_pair(x, y)));
+								if (!closedList[x][y]){
+									openList.push(make_pair(fNew, make_pair(x, y)));
+								} 
 
 								// Update the details of this cell
 								cellDetails[x*dim_y+y].f = fNew;
@@ -289,8 +360,8 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 								cellDetails[x*dim_y+y].parent_i = i;
 								cellDetails[x*dim_y+y].parent_j = j;
 							}
-							omp_unset_lock(&cellLock);
 							omp_unset_lock(&closeListLock);
+							omp_unset_lock(&cellLock);
 							omp_unset_lock(&openListLock);
 						}
 					}
@@ -303,7 +374,13 @@ void aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y)
 	printf("The destination cell is found\n");	
 	tracePath(cellDetails, dest, dim_y);
 
-	return;
+	clock_gettime(CLOCK_REALTIME, &requestEnd);
+	// Calculate time it took
+	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
+
+	outputFile(input_filename, (bool*)closedList, cellDetails, dim_x, dim_y, nproc, dest);
+
+	return accum;
 }
 
 int main(int argc, const char *argv[]) {
@@ -346,16 +423,11 @@ int main(int argc, const char *argv[]) {
     Pair dest = make_pair(dim_x - 1, dim_y - 1);
 
     // A* Sequential Algorithm
-	// Calculate time taken by a request
-	struct timespec requestStart, requestEnd;
-	clock_gettime(CLOCK_REALTIME, &requestStart);
+	double accum;
 	omp_set_num_threads(numProc);
 	for (int i = 0; i < 1; i++) {
-		aStarSearch(map, src, dest, dim_x, dim_y);
+		accum = aStarSearch(map, src, dest, dim_x, dim_y, numProc, inputFilename);
 	}
-	clock_gettime(CLOCK_REALTIME, &requestEnd);
-	// Calculate time it took
-	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 
 	printf("\n");
 	printf("Total Execution Time: %lf\n", accum);
