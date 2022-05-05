@@ -202,8 +202,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 	while (conditionFlag) {
         for (int node = 0; node < nproc; node++)
         {
-            pPair tmpPair;
-            cell tmpCell;
             int flag_data = 0;
             int flag_done = 0;
             int flag_cell = 0;
@@ -213,6 +211,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
                 while (flag_data && flag_cell)
                 {
+                    pPair tmpPair;
+                    cell tmpCell;
                     MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
                     MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
 
@@ -294,7 +294,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                         foundDest = true;
                         //update if you have better path
                         int fnew=cellDetails[i*dim_y+j].f;
-                        if (fnew< localDestCost) {
+                        if (fnew < localDestCost) {
                             localDestCost = min(fnew,localDestCost);
                             // Set the Parent of the destination cell
                             if(localDestCost==fnew){
@@ -430,50 +430,50 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     MPI_Barrier(MPI_COMM_WORLD);
 
 
-    // File outputs
-	char resolved_path[PATH_MAX];
-    realpath(input_filename, resolved_path);
-    char *base = basename(resolved_path);
-    std::string baseS = std::string(base);
-    size_t lastindex = baseS.find_last_of("."); 
-    string rawname = baseS.substr(0, lastindex); 
+    // // File outputs
+	// char resolved_path[PATH_MAX];
+    // realpath(input_filename, resolved_path);
+    // char *base = basename(resolved_path);
+    // std::string baseS = std::string(base);
+    // size_t lastindex = baseS.find_last_of("."); 
+    // string rawname = baseS.substr(0, lastindex); 
 
-    std::stringstream Output;
-    Output << "outputs//openMPI_" << rawname.c_str() << "_" << nproc << ".txt";
-    std::string OutputFile = Output.str();
-    const char *ocf = OutputFile.c_str();
+    // std::stringstream Output;
+    // Output << "outputs//openMPI_" << rawname.c_str() << "_" << nproc << ".txt";
+    // std::string OutputFile = Output.str();
+    // const char *ocf = OutputFile.c_str();
 
-    int *mapSearch = (int*)calloc(dim_x*dim_y, sizeof(int));
-    for (int a = 0; a < dim_y; a++) {
-        for (int b = 0; b < dim_x; b++) {
-            if (cellDetails[a*dim_y+b].parent_i != -1) {
-                mapSearch[a*dim_y+b] = 1;
-            }
-            else {
-                mapSearch[a*dim_y+b] = 0;
-            }
-        }
-    }
+    // int *mapSearch = (int*)calloc(dim_x*dim_y, sizeof(int));
+    // for (int a = 0; a < dim_y; a++) {
+    //     for (int b = 0; b < dim_x; b++) {
+    //         if (cellDetails[a*dim_y+b].parent_i != -1) {
+    //             mapSearch[a*dim_y+b] = 1;
+    //         }
+    //         else {
+    //             mapSearch[a*dim_y+b] = 0;
+    //         }
+    //     }
+    // }
 
-    int *allMapSearch = (int*)calloc(dim_x*dim_y*nproc, sizeof(int));
-    MPI_Gather(mapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, allMapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    // int *allMapSearch = (int*)calloc(dim_x*dim_y*nproc, sizeof(int));
+    // MPI_Gather(mapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, allMapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, 0, MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
 
-    FILE *outFile; 
-    if (procID == 0) {
-        outFile = fopen(ocf, "w+");
-        fprintf(outFile, "%d %d %d \n", dim_x, dim_y, nproc);
-        for (int node = 0; node < nproc; node++) {
-            for (int a = 0; a < dim_y; a++) {
-                for (int b = 0; b < dim_x; b++) {
-                    fprintf(outFile, "%d ", allMapSearch[node*dim_x*dim_y + (a*dim_y + b)]);
-                }
-                fprintf(outFile, "\n");
-            }
-        }   
-    }
+    // FILE *outFile; 
+    // if (procID == 0) {
+    //     outFile = fopen(ocf, "w+");
+    //     fprintf(outFile, "%d %d %d \n", dim_x, dim_y, nproc);
+    //     for (int node = 0; node < nproc; node++) {
+    //         for (int a = 0; a < dim_y; a++) {
+    //             for (int b = 0; b < dim_x; b++) {
+    //                 fprintf(outFile, "%d ", allMapSearch[node*dim_x*dim_y + (a*dim_y + b)]);
+    //             }
+    //             fprintf(outFile, "\n");
+    //         }
+    //     }   
+    // }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
 
 	return computeTime;
 }

@@ -413,6 +413,9 @@ int main(int argc, char *argv[]) {
 
 	printf("\n");
 	printf("Total Execution Time: %lf\n", accum);
+	printf("Size of cell %ld\n",sizeof(cell));
+	printf("Size of pPair %ld\n",sizeof(pPair));
+	printf("Size of Pair %ld\n",sizeof(Pair));
 
 	fclose(input);
  
