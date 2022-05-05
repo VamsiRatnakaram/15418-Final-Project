@@ -71,4 +71,7 @@ PR/prioq.o: PR/prioq.c
 
 clean:
 	/bin/rm -rf *~ *.o $(APP_NAME) *.class
-	/bin/rm -rf *~ *.o $(APP_NAME_MP) *.class
+	/bin/rm -rf *~ *.o $(APP_NAME_MP1) *.class
+	/bin/rm -rf *~ *.o $(APP_NAME_MP2) *.class
+	/bin/rm -rf *~ *.o $(APP_NAME_MPI1) *.class
+	/bin/rm -rf *~ *.o $(APP_NAME_MPI2) *.class
