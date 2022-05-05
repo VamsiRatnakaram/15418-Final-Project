@@ -4,12 +4,12 @@ OBJS += seq_aStar.o
 CXX = g++ -m64 -std=c++11
 CXXFLAGS = -O3 -Wall -Wextra
 
-APP_NAME_MP=openMP_aStar
-# OBJS_MP += PR/common.o
-# OBJS_MP += PR/ptst.o
-# OBJS_MP += PR/gc.o
-# OBJS_MP += PR/prioq.o
-OBJS_MP += openMP_aStar.o
+APP_NAME_MP=openMP_aStar_v2
+OBJS_MP += PR/common.o
+OBJS_MP += PR/ptst.o
+OBJS_MP += PR/gc.o
+OBJS_MP += PR/prioq.o
+OBJS_MP += openMP_aStar_v2.o
 
 CXX_MP = g++ -m64 -std=c++11
 CXXFLAGS_MP = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas
@@ -41,8 +41,8 @@ seq_aStar.o: seq_aStar.cpp
 openMP_aStar.o: openMP_aStar.cpp
 	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
 
-# openMP_aStar_v2.o: openMP_aStar_v2.cpp
-# 	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
+openMP_aStar_v2.o: openMP_aStar_v2.cpp
+	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
 
 openMPI_aStarv3.o: openMPI_aStarv3.cpp
 	$(CXX_MPI) $< $(CXXFLAGS_MPI) -c -o $@

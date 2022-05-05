@@ -291,17 +291,16 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 				// printf("size %d\n", openList.size());
 				p = openList.top();
 				openList.pop();
+				omp_unset_lock(&openListLock);
 				i = p.second.first;
 				j = p.second.second;
 				omp_set_lock(&closeListLock);
 				if(closedList[i][j]){
 					omp_unset_lock(&closeListLock);
-					omp_unset_lock(&openListLock);
 					continue;
 				}
 				closedList[i][j]=true;
 				omp_unset_lock(&closeListLock);
-				omp_unset_lock(&openListLock);
 
 				/*	
 				Generating all the 4 successor of this cell
