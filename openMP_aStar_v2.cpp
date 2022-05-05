@@ -18,7 +18,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <omp.h>
-#include "PR/prioq.h"
+#include "minheap.hpp"
 
 #define BILLION  1E9;
 
@@ -53,12 +53,6 @@ int get_option_int(const char *option_name, int default_value) {
             return atoi(_argv[i + 1]);
     return default_value;
 }
-
-// Creating a shortcut for int, int pair type
-typedef pair<int, int> Pair;
-
-// Creating a shortcut for pair<int, pair<int, int>> type
-typedef pair<double, pair<int, int> > pPair;
 
 // A structure to hold the necessary parameters
 struct cell {
@@ -274,14 +268,14 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	pair.*/
     //std::priority_queue<pPair, vector<pPair>, compare> openList;
 
-	pq_t *openList = pq_init(DEFAULT_OFFSET);
+	moodycamel::ConcurrentQueue<int> q;
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
 	Pair *temp= (Pair*)(malloc(sizeof(Pair)));
 	temp->first=l;
 	temp->second=m;
-	insert(openList,0.0,(void*)temp);
+	// insert(openList,0.0,(void*)temp);
 	//openList.push(make_pair(0.0, make_pair(l, m)));
 
 	// We set this boolean value as false as initially
@@ -299,7 +293,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			double gNew, hNew, fNew;
 			
 			printf("processing...\n");
-			Pair *p = (Pair*)deletemin(openList);
+			// Pair *p = (Pair*)deletemin(openList);
 			if(p==NULL){
 				continue;
 			}

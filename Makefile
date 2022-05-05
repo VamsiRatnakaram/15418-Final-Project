@@ -8,14 +8,10 @@ APP_NAME_MP1=openMP_aStar
 OBJS_MP1 += openMP_aStar.o
 
 APP_NAME_MP2=openMP_aStar_v2
-OBJS_MP2 += PR/common.o
-OBJS_MP2 += PR/ptst.o
-OBJS_MP2 += PR/gc.o
-OBJS_MP2 += PR/prioq.o
 OBJS_MP2 += openMP_aStar_v2.o
 
 CXX_MP = g++ -m64 -std=c++11
-CXXFLAGS_MP = -I. -g -O3 -Wall -fopenmp -Wno-unknown-pragmas -DCACHE_LINE_SIZE=`getconf LEVEL1_DCACHE_LINESIZE`
+CXXFLAGS_MP = -I. -g -O3 -Wall -fopenmp -Wno-unknown-pragmas
 
 APP_NAME_MPI1=openMPI_aStarv2
 OBJS_MPI1 += openMPI_aStarv2.o
