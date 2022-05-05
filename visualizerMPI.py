@@ -27,12 +27,14 @@ def main(mapFile, outFile):
         nproc = int(nproc)
         dim = int(dim)
 
+        colorNum = 3
         for t in range(nproc):
             for x in range(dim):
                 line = f.readline()
                 for y, val in enumerate(line.split()): 
                     if (int(val)):
-                        mapMatrix[x][y] = int(2)
+                        mapMatrix[x][y] = int(colorNum)
+            colorNum += 1
 
         while True:
             line = f.readline()
@@ -44,13 +46,13 @@ def main(mapFile, outFile):
             else:
                 x = int(x)
                 y = int(y)
-                mapMatrix[x][y] = int(3)
+                mapMatrix[x][y] = int(2)
 
     # mapMatrix[0][0] = int(0)
     # print(mapMatrix)
 
     # Color Grid with map
-    cmap = colors.ListedColormap(['White','Black','Red', 'Green'])
+    cmap = colors.ListedColormap(['White','Black','Green','Red','Blue', 'Orange', 'Yellow'])
     plt.figure(figsize=(dim,dim))
     plt.pcolor(mapMatrix[::-1],cmap=cmap,edgecolors='k', linewidths=3)
     plt.xlabel('Length: {}'.format(length))

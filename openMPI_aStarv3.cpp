@@ -230,8 +230,19 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                     }
                     MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
                     MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+
+                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    pair<bool, int> tmp;
+                    if (flag_done){
+                        MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                        conditionFlag=false;
+                        break;
+                    }
                 }
             }
+        }
+        if(!conditionFlag){
+            break;
         }
 
         if (openList.size() != 0) {
@@ -279,6 +290,13 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                         int fnew=cellDetails[i*dim_y+j].f;
                         localDestCost=fnew;
                         localDestVertex=make_pair(fnew, make_pair(i, j));
+                        conditionFlag=false;
+                        for (int node = 0; node < nproc; node++) {
+                                if (node != procID) {
+                                    pair<bool, int> tmp = make_pair(localFoundDest, localDestCost);
+                                    MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                                }
+                        }
                         break;
                     }
                     else if (isUnBlocked(map, x, y, dim_y) == true) {
@@ -299,17 +317,17 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 }
             }
         }
-        bool tmpLocalFoundDestArray[nproc];
-        bool tmpBool = false;
-        MPI_Allgather(&localFoundDest, 1, MPI_BYTE, tmpLocalFoundDestArray, 1, MPI_BYTE, MPI_COMM_WORLD);
-        for(int p = 0; p<nproc; p++) {
-            if(tmpLocalFoundDestArray[p]) {
-                tmpBool = true;
-            }
-        }
-        if (tmpBool) {
-            break;
-        }
+        // bool tmpLocalFoundDestArray[nproc];
+        // bool tmpBool = false;
+        // MPI_Allgather(&localFoundDest, 1, MPI_BYTE, tmpLocalFoundDestArray, 1, MPI_BYTE, MPI_COMM_WORLD);
+        // for(int p = 0; p<nproc; p++) {
+        //     if(tmpLocalFoundDestArray[p]) {
+        //         tmpBool = true;
+        //     }
+        // }
+        // if (tmpBool) {
+        //     break;
+        // }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

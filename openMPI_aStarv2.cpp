@@ -101,25 +101,17 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
             openList->push(pairToSend);
             cellDetails[x*dim_x + y] = cellToSend;
         }
-        // // if (p= 0) {
-        //     MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-		//     MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-        // }
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
 		MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, indexToSend, TAG_CELL, MPI_COMM_WORLD, &request);
-        // if (procID != 0) {
-        //     MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, 0, TAG_DATA, MPI_COMM_WORLD, &request);
-		//     MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, 0, TAG_CELL, MPI_COMM_WORLD, &request);
-        // }
 	}
 }
 
 // A Function to find the shortest path between
 // a given source cell to a destination cell according
 // to A* Search Algorithm
-double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID, int nproc, const char* input_filename)
+double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID, int nproc, const char *input_filename)
 {
     // StartTime after intialization
     double startTime = MPI_Wtime();
@@ -243,10 +235,11 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 
                 // Found Dest has been sent
                 MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-                while(flag_done){
-                    pair<bool, int> tmp;
+                pair<bool, int> tmp;
+                if (flag_done){
                     MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                    foundDest = tmp.first;
+                    globalBestCost = min(tmp.second,globalBestCost);
                 }
             }
         }
@@ -296,12 +289,12 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 if (isValid(x, y, dim_x, dim_y) == true) {
                     // If the destination cell is the same as the
                     // current successor
-                    if (isDestination(x, y, dest) == true) {
+                    if (isDestination(x, y, dest) =
+                    = true) {
                         localFoundDest = true;
                         foundDest = true;
                         //update if you have better path
                         int fnew=cellDetails[i*dim_y+j].f;
-                        globalBestCost=min(fnew,globalBestCost);
                         if (fnew< localDestCost) {
                             localDestCost = min(fnew,localDestCost);
                             // Set the Parent of the destination cell
@@ -309,7 +302,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                                 localDestVertex = make_pair(fnew, make_pair(i, j));
                                 for (int node = 0; node < nproc; node++) {
                                     if (node != procID) {
-                                        pair<bool, int> tmp = make_pair(localFoundDest, localDestCost);
+                                        pair<bool, int> tmp = make_pair(foundDest, localDestCost);
                                         MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
                                     }
                                 }
@@ -387,7 +380,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
             int ownerNode = (tmpPair.first*dim_y + tmpPair.second) % nproc;
             if (ownerNode != procID) {
                 MPI_Send((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_REQ, MPI_COMM_WORLD);
+                // printf("0 sent\n");
                 MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_PAIR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                // printf("0 recieved\n");
             }
             else {
                 tmpPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
@@ -424,13 +419,15 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
         MPI_Iprobe(0, TAG_REQ, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
 		if (flag) {
 			MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, 0, TAG_REQ, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // printf("node %d recieved\n", procID);
             parentPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
+            // printf("node %d sent\n", procID);
             MPI_Send((void*)(&parentPair), 8, MPI_BYTE, 0, TAG_PAIR, MPI_COMM_WORLD);
         }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-    
+
     // EndTime before I/O
     double endTime = MPI_Wtime();
 	double computeTime = endTime - startTime;
@@ -510,12 +507,14 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
             }
         }
 
+        int pathLength=0;
         while (!Path.empty()) {
+            pathLength++;
 		    pair<int, int> p = Path.top();
 		    Path.pop();
 		    fprintf(outFile, "%d %d\n", p.first, p.second);
 	    }
-        fprintf(outFile, "\n");
+        fprintf(outFile, "LENGTH %d", pathLength);
     }
 
     while (!traceDone) {
@@ -604,6 +603,8 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
     // A* Sequential Algorithm
+    
+    // StartTime after intialization
     double computeTime;
 	for (int i = 0; i < 1; i++) {
 		computeTime = aStarSearch(map, src, dest, dim_x, dim_y, procID, nproc, inputFilename);
@@ -616,5 +617,4 @@ int main(int argc, char *argv[]) {
  
     return (0);
 }
-
 
