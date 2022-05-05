@@ -19,8 +19,6 @@
 #include <sys/time.h>
 #include <omp.h>
 
-#include "tmp/oneTBB/include/oneapi/tbb/concurrent_priority_queue.h"
-
 #define BILLION  1E9;
 
 // #include "CycleTimer.h"
@@ -136,7 +134,7 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
     string rawname = baseS.substr(0, lastindex); 
 
     std::stringstream Output;
-    Output << "outputs//openMP	_" << rawname.c_str() << "_" << num_of_threads << ".txt";
+    Output << "outputs//openMP_" << rawname.c_str() << "_" << num_of_threads << ".txt";
     std::string OutputFile = Output.str();
 
     const char *ocf = OutputFile.c_str();
@@ -170,11 +168,15 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
 	}
 
 	Path.push(make_pair(row, col));
+	int pathLength=0;
 	while (!Path.empty()) {
+		pathLength++;
 		pair<int, int> p = Path.top();
 		Path.pop();
 		fprintf(outFile, "%d %d \n", p.first, p.second);
 	}
+
+	fprintf(outFile, "LENGTH %d", pathLength);
 
 	fclose(outFile);
 

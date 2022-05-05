@@ -152,11 +152,16 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
 	}
 
 	Path.push(make_pair(row, col));
+
+	int pathLength=0;
 	while (!Path.empty()) {
+		pathLength++;
 		pair<int, int> p = Path.top();
 		Path.pop();
 		fprintf(outFile, "%d %d \n", p.first, p.second);
 	}
+
+	fprintf(outFile, "LENGTH %d", pathLength);
 
 	fclose(outFile);
 
@@ -344,6 +349,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const ch
 	// blockages)
 	if (foundDest == false)
 		printf("Failed to find the Destination Cell\n");
+
+	free(cellDetails);
 
 	return accum;
 }

@@ -8,11 +8,12 @@ def main(mapFile, outFile):
     mapMatrix = []
 
     dim = 0
+    nproc = 0
     length = 0
     with open(mapFile, 'r') as f:
         line = f.readline()
-        for i in line.split():
-            dim = int(i)
+        dim, dim = line.split()
+        dim = int(dim)
 
         for i in range(dim):
             line = f.readline()
@@ -22,14 +23,16 @@ def main(mapFile, outFile):
 
     with open(outFile, 'r') as f:
         line = f.readline()
-        for i in line.split():
-            dim = int(i)
+        dim, dim, nproc = line.split()
+        nproc = int(nproc)
+        dim = int(dim)
 
-        for x in range(dim):
-            line = f.readline()
-            for y, val in enumerate(line.split()): 
-                if (int(val)):
-                    mapMatrix[x][y] = int(2)
+        for t in range(nproc):
+            for x in range(dim):
+                line = f.readline()
+                for y, val in enumerate(line.split()): 
+                    if (int(val)):
+                        mapMatrix[x][y] = int(2)
 
         while True:
             line = f.readline()
@@ -55,7 +58,7 @@ def main(mapFile, outFile):
 
 if __name__ == "__main__":
     if (len(sys.argv) != 3):
-        print('Usage: python3 visualizer.py <inputFile (map)> <outputFilename (results)>')
+        print('Usage: python3 visualizerMPI.py <inputFile (map)> <outputFilename (results)>')
         exit
     mapFile = str(sys.argv[1])
     outFile = str(sys.argv[2])

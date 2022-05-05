@@ -4,7 +4,7 @@ import sys
 
 def main(size, filename):
     matrix = np.zeros((size, size))
-    matrix = [[(1 if np.random.rand() < 0.2 else x) for x in line] for line in matrix]
+    matrix = [[(1 if np.random.rand() < 0.3 else x) for x in line] for line in matrix]
 
     with open(filename, 'w+') as testfile:
         testfile.write('{} {}\n'.format(size, size))
@@ -13,7 +13,7 @@ def main(size, filename):
 
 if __name__ == "__main__":
     if (len(sys.argv) != 3):
-        print('Usage: python3 testGenerate <matrixDimension> <outputFilename>')
+        print('Usage: python3 testGenerate.py <matrixDimension> <outputFilename>')
         exit
     size = int(sys.argv[1])
     filename = str(sys.argv[2])

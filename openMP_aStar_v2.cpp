@@ -18,6 +18,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <omp.h>
+#include "PR/prioq.h"
 
 #define BILLION  1E9;
 
@@ -56,7 +57,7 @@ struct cell {
 	int parent_i, parent_j;
 	// f = g + h
 	double f, g, h;
-	omp_lock_t cell_lock
+	omp_lock_t cell_lock;
 };
 
 struct compare{
@@ -135,7 +136,7 @@ void outputFile(const char *input_filename, bool *closedList, cell *cellDetails,
     string rawname = baseS.substr(0, lastindex); 
 
     std::stringstream Output;
-    Output << "outputs//openMP	_" << rawname.c_str() << "_" << num_of_threads << ".txt";
+    Output << "outputs//openMP_" << rawname.c_str() << "_" << num_of_threads << ".txt";
     std::string OutputFile = Output.str();
 
     const char *ocf = OutputFile.c_str();
@@ -219,12 +220,13 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	// Create a closed list and initialise it to false which
 	// means that no cell has been included yet This closed
 	// list is implemented as a boolean 2D array
+	int l, m;
 	bool closedList[dim_x][dim_y];
 	memset(closedList, false, sizeof(closedList));
 	omp_lock_t closedLocks[dim_x][dim_y];
 	for (l = 0; l < dim_y; l++) {
 		for (m = 0; m < dim_x; m++) {
-			omp_init_lock(&closedLocks[l][m]]);
+			omp_init_lock(&closedLocks[l][m]);
 		}
 	}
 
@@ -232,7 +234,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	// of that cell
 	// cell cellDetails[dim_x][dim_y];
 	cell *cellDetails = (cell*)calloc(dim_x*dim_y, sizeof(cell));
-	int l, m;
 
 	for (l = 0; l < dim_y; l++) {
 		for (m = 0; m < dim_x; m++) {
@@ -261,11 +262,17 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	Note that 0 <= i <= ROW-1 & 0 <= j <= COL-1
 	This open list is implemented as a set of pair of
 	pair.*/
-    std::priority_queue<pPair, vector<pPair>, compare> openList;
+    //std::priority_queue<pPair, vector<pPair>, compare> openList;
+
+	pq_t *openList = pq_init(10);
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
-	openList.push(make_pair(0.0, make_pair(l, m)));
+	Pair *temp= (Pair*)(malloc(sizeof(Pair)));
+	temp->first=l;
+	temp->second=m;
+	insert(openList,0.0,(void*)temp);
+	//openList.push(make_pair(0.0, make_pair(l, m)));
 
 	// We set this boolean value as false as initially
 	// the destination is not reached.
@@ -276,96 +283,89 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	{
 		// printf("Num threads:%d \n",omp_get_num_threads());
 		while (!foundDest) {
-			pPair p;
+			
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
 			double gNew, hNew, fNew;
-			// printf("here\n");
-			omp_set_lock(&openListLock);
-			// printf("here\n");
-			if(openList.size() == 0){
-				omp_unset_lock(&openListLock);
+			
+			// printf("size %d\n", openList.size());
+			Pair *p = (Pair*)deletemin(openList);
+			if(p==NULL){
 				continue;
 			}
-			else  {
-				// printf("size %d\n", openList.size());
-				p = openList.top();
-				openList.pop();
-				i = p.second.first;
-				j = p.second.second;
-				omp_set_lock(&closeLocks[i][j]);
-				if(closedList[i][j]){
-					omp_unset_lock(&closeListLock);
-					omp_unset_lock(&openListLock);
-					continue;
+			i = p->first;
+			j = p->second;
+			free(p);
+			omp_set_lock(&closedLocks[i][j]);
+			if(closedList[i][j]){
+				omp_unset_lock(&closedLocks[i][j]);
+				continue;
+			}
+			closedList[i][j]=true;
+			omp_unset_lock(&closedLocks[i][j]);
+			/*	
+			Generating all the 4 successor of this cell
+			Cell-->Popped Cell (i, j)
+			N --> North	 (i-1, j)
+			S --> South	 (i+1, j)
+			E --> East	 (i, j+1)
+			W --> West   (i, j-1)*/
+			for (z = 0; z < 4; z++) {
+				// Only process this cell if this is a valid one
+				// int x, y;
+				if (z==0) {
+					x = i-1;
+					y = j;
 				}
-				closedList[i][j]=true;
-				omp_unset_lock(&closeLocks[i][j]);
-				omp_unset_lock(&openListLock);
+				else if (z==1) {
+					x = i+1;
+					y = j;
+				}
+				else if (z==2) {
+					x = i;
+					y = j+1;
+				}
+				else {
+					x = i;
+					y = j-1;
+				}
+				
+				if (isValid(x, y, dim_x, dim_y) == true) {
+					// If the destination cell is the same as the
+					// current successor
+					if (isDestination(x, y, dest) == true) {
+						// Set the Parent of the destination cell
+						omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
+						cellDetails[x*dim_y+y].parent_i = i;
+						cellDetails[x*dim_y+y].parent_j = j;
+						omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
+						foundDest = true;
+					}
+					if (isUnBlocked(map, x, y, dim_y) == true) {
+						omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
+						omp_set_lock(&closedLocks[x][y]);
+						gNew = cellDetails[i*dim_y+j].g + 1.0;
+						hNew = calculateHValue(x, y, dest);
+						fNew = gNew + hNew;
 
-				/*	
-				Generating all the 4 successor of this cell
-				Cell-->Popped Cell (i, j)
-				N --> North	 (i-1, j)
-				S --> South	 (i+1, j)
-				E --> East	 (i, j+1)
-				W --> West   (i, j-1)*/
-				for (z = 0; z < 4; z++) {
-					// Only process this cell if this is a valid one
-					// int x, y;
-					if (z==0) {
-						x = i-1;
-						y = j;
-					}
-					else if (z==1) {
-						x = i+1;
-						y = j;
-					}
-					else if (z==2) {
-						x = i;
-						y = j+1;
-					}
-					else {
-						x = i;
-						y = j-1;
-					}
-					
-					if (isValid(x, y, dim_x, dim_y) == true) {
-						// If the destination cell is the same as the
-						// current successor
-						if (isDestination(x, y, dest) == true) {
-							// Set the Parent of the destination cell
-							omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
+						if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
+							
+							if (!closedList[x][y]){
+								Pair *temp= (Pair*)(malloc(sizeof(Pair)));
+								temp->first=x;
+								temp->second=y;
+								insert(openList,fNew,(void*)temp);
+							} 
+
+							// Update the details of this cell
+							cellDetails[x*dim_y+y].f = fNew;
+							cellDetails[x*dim_y+y].g = gNew;
+							cellDetails[x*dim_y+y].h = hNew;
 							cellDetails[x*dim_y+y].parent_i = i;
 							cellDetails[x*dim_y+y].parent_j = j;
-							omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
-							foundDest = true;
 						}
-						if (isUnBlocked(map, x, y, dim_y) == true) {
-							omp_set_lock(&openListLock);
-							omp_set_lock(&(cellDetails[x*dim_y+y].cell_lock));
-							omp_set_lock(&closeLocks[x][y]);
-							gNew = cellDetails[i*dim_y+j].g + 1.0;
-							hNew = calculateHValue(x, y, dest);
-							fNew = gNew + hNew;
-
-							if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
-								
-								if (!closedList[x][y]){
-									openList.push(make_pair(fNew, make_pair(x, y)));
-								} 
-
-								// Update the details of this cell
-								cellDetails[x*dim_y+y].f = fNew;
-								cellDetails[x*dim_y+y].g = gNew;
-								cellDetails[x*dim_y+y].h = hNew;
-								cellDetails[x*dim_y+y].parent_i = i;
-								cellDetails[x*dim_y+y].parent_j = j;
-							}
-							omp_unset_lock(&closeLocks[x][y]);
-							omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
-							omp_unset_lock(&openListLock);
-						}
+						omp_unset_lock(&closedLocks[x][y]);
+						omp_unset_lock(&(cellDetails[x*dim_y+y].cell_lock));
 					}
 				}
 			}
