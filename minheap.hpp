@@ -5,7 +5,26 @@
 #include <shared_mutex>
 #include <vector>
 #include <algorithm>
-#include <utility>
+#include <assert.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <libgen.h>
+#include <math.h>
+#include <queue>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <linux/limits.h>
+#include <string>
+#include <unistd.h>
+#include <stack>
+#include <bits/stdc++.h>
+#include <chrono>
+#include <time.h>
+#include <sys/time.h>
+#include <omp.h>
 #include <bits/stdc++.h>
 
 // Creating a shortcut for int, int pair type
