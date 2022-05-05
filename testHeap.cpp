@@ -17,9 +17,9 @@ typedef pair<double, pair<int, int> > pPair;
 int main(){
     MinHeap heap;
 
-    pPair tmp = make_pair(1.0, make_pair(0, 0));
+    pPair tmp = make_pair(4.0, make_pair(0, 0));
     heap.insert(tmp);
-    pPair tmp2 = make_pair(4.0, make_pair(0, 0));
+    pPair tmp2 = make_pair(3.0, make_pair(0, 0));
     heap.insert(tmp2);
     pPair tmp3 = make_pair(6.0, make_pair(0, 0));
     heap.insert(tmp3);
