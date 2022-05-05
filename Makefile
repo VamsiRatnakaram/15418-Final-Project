@@ -9,13 +9,13 @@ OBJS_MP1 += openMP_aStar.o
 
 APP_NAME_MP2=openMP_aStar_v2
 OBJS_MP2 += PR/common.o
-OBJS_MP2 += PR/gc/ptst.o
-OBJS_MP2 += PR/gc/gc.o
+OBJS_MP2 += PR/ptst.o
+OBJS_MP2 += PR/gc.o
 OBJS_MP2 += PR/prioq.o
 OBJS_MP2 += openMP_aStar_v2.o
 
 CXX_MP = g++ -m64 -std=c++11
-CXXFLAGS_MP = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas
+CXXFLAGS_MP = -I. -g -O3 -Wall -fopenmp -Wno-unknown-pragmas -DCACHE_LINE_SIZE=`getconf LEVEL1_DCACHE_LINESIZE`
 
 APP_NAME_MPI1=openMPI_aStarv2
 OBJS_MPI1 += openMPI_aStarv2.o
@@ -66,8 +66,8 @@ openMPI_aStarv2.o: openMPI_aStarv2.cpp
 openMPI_aStarv3.o: openMPI_aStarv3.cpp
 	$(CXX_MPI) $< $(CXXFLAGS_MPI) -c -o $@
 
-PR/prioq.o: PR/prioq.c
-	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
+# PR/prioq.o: PR/prioq.c
+# 	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
 
 clean:
 	/bin/rm -rf *~ *.o $(APP_NAME) *.class

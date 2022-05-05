@@ -88,7 +88,7 @@ double calculateHValue(int row, int col, Pair dest)
 	return abs(dest.second - col) + abs(dest.first - row);
 }
 
-void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair, vector<pPair>, compare> *openList, bool *closedList, cell cellToSend, cell *cellDetails, int localDestCost) {
+void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair, vector<pPair>, compare> *openList, cell cellToSend, cell *cellDetails, int localDestCost, int globalBestCost) {
 	int x = pairToSend.second.first;
 	int y = pairToSend.second.second;
 	int index = x*dim_x + y;
@@ -97,7 +97,8 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 
 	MPI_Request request = MPI_REQUEST_NULL;
 	if (indexToSend == procID) {
-        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > pairToSend.first && localDestCost > cellDetails[x*dim_x + y].f)) {
+        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > pairToSend.first && localDestCost > pairToSend.first &&
+        globalBestCost > pairToSend.first )) {
             openList->push(pairToSend);
             cellDetails[x*dim_x + y] = cellToSend;
         }
@@ -143,12 +144,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 		printf("We are already at the destination\n");
 		return -1;
 	}
-
-	// Create a closed list and initialise it to false which
-	// means that no cell has been included yet This closed
-	// list is implemented as a boolean 2D array
-	bool closedList[dim_x][dim_y];
-	memset(closedList, false, sizeof(closedList));
 
 	// Declare a 2D array of structure to hold the details
 	// of that cell
@@ -298,18 +293,16 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                         localFoundDest = true;
                         foundDest = true;
                         //update if you have better path
-                        int fnew=cellDetails[i*dim_y+j].f;
-                        if (fnew < localDestCost) {
-                            localDestCost = min(fnew,localDestCost);
+                        int cost=cellDetails[i*dim_y+j].g+1.0;
+                        if (cost < localDestCost) {
+                            localDestCost = cost;
                             // Set the Parent of the destination cell
-                            if(localDestCost==fnew){
                                 localDestVertex = make_pair(fnew, make_pair(i, j));
-                                for (int node = 0; node < nproc; node++) {
-                                    if (node != procID) {
-                                        pair<bool, int> tmp = make_pair(foundDest, localDestCost);
-                                        MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-                                        MPI_Wait(&request, MPI_STATUS_IGNORE);
-                                    }
+                            for (int node = 0; node < nproc; node++) {
+                                if (node != procID) {
+                                    pair<bool, int> tmp = make_pair(foundDest, localDestCost);
+                                    MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                                 }
                             }
                         }
@@ -328,7 +321,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                         cellToSend.h = hNew;
                         cellToSend.parent_i = i;
                         cellToSend.parent_j = j;
-                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, cellDetails, localDestCost);        
+                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, cellToSend, cellDetails, localDestCost, globalDestCost);        
                     }
                 }
             }
@@ -454,8 +447,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
                 MPI_Wait(&request, MPI_STATUS_IGNORE);
                 MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
-                MPI_Wait(&request, MPI_STATUS_IGNORE);
-                
+                MPI_Wait(&request, MPI_STATUS_IGNORE); 
                 MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
                 MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
             }

@@ -88,7 +88,7 @@ double calculateHValue(int row, int col, Pair dest)
 	return abs(dest.second - col) + abs(dest.first - row);
 }
 
-void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair, vector<pPair>, compare> *openList, bool *closedList, cell cellToSend, cell *cellDetails, int localDestCost) {
+void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std::priority_queue<pPair, vector<pPair>, compare> *openList, cell cellToSend, cell *cellDetails) {
 	int x = pairToSend.second.first;
 	int y = pairToSend.second.second;
 	int index = x*dim_x + y;
@@ -97,11 +97,9 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 
 	MPI_Request request = MPI_REQUEST_NULL;
 	if (indexToSend == procID) {
-        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > pairToSend.first && localDestCost > cellDetails[x*dim_x + y].f)) {
-            if (!closedList[x*dim_x + y]) {
-                openList->push(pairToSend);
-                cellDetails[x*dim_x + y] = cellToSend;
-            }
+        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > pairToSend.first)) {
+            openList->push(pairToSend);
+            cellDetails[x*dim_x + y] = cellToSend;
         }
 	}
 	else {
@@ -146,12 +144,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 		printf("We are already at the destination\n");
 		return -1;
 	}
-
-	// Create a closed list and initialise it to false which
-	// means that no cell has been included yet This closed
-	// list is implemented as a boolean 2D array
-	bool closedList[dim_x][dim_y];
-	memset(closedList, false, sizeof(closedList));
 
 	// Declare a 2D array of structure to hold the details
 	// of that cell
@@ -228,7 +220,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                     int indexToSend = index % nproc;
 
                     if (indexToSend == procID) {
-                        if (!closedList[x][y]) {
+                        if (cellDetails[x*dim_x + y].f == INT_MAX || (cellDetails[x*dim_x + y].f > tmpPair.first)) {
                             openList.push(tmpPair);
                             cellDetails[x*dim_y+y] = tmpCell;
                         }
@@ -257,12 +249,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
             // Add this vertex to the closed list
             i = p.second.first;
             j = p.second.second;
-            if (closedList[i][j]) {
-                continue;
-            }
-            else {
-                closedList[i][j] = true;
-            }
 
             // To store the 'g', 'h' and 'f' of the 4 successors
             double gNew, hNew, fNew;
@@ -292,7 +278,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                     if (isDestination(x, y, dest) == true) {
                         localFoundDest = true;
                         //update if you have better path
-                        int fnew=cellDetails[i*dim_y+j].f;
+                        int fnew=cellDetails[i*dim_y+j].g+1.0;
                         localDestCost=fnew;
                         localDestVertex=make_pair(fnew, make_pair(i, j));
                         conditionFlag=false;
@@ -318,15 +304,18 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                         cellToSend.h = hNew;
                         cellToSend.parent_i = i;
                         cellToSend.parent_j = j;
-                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, (bool*)closedList, cellToSend, cellDetails, localDestCost);        
+                        hashedSendFunction(pairToSend, dim_x, nproc, procID, &openList, cellToSend, cellDetails);        
                     }
                 }
             }
+
         }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
+    // EndTime before I/O
+    double endTime = MPI_Wtime();
+	double computeTime = endTime - startTime;
 
     MPI_Status status;
 
@@ -407,10 +396,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    // EndTime before I/O
-    double endTime = MPI_Wtime();
-	double computeTime = endTime - startTime;
 
     for (int node = 0; node < nproc; node++)
     {

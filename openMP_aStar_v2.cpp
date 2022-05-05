@@ -22,6 +22,16 @@
 
 #define BILLION  1E9;
 
+/* check your cpu core numbering before pinning */
+#define PIN
+#define WEAK_MEM_ORDER
+
+#define DEFAULT_SECS 10
+#define DEFAULT_NTHREADS 1
+#define DEFAULT_OFFSET 32
+#define DEFAULT_SIZE 1<<15
+#define EXPS 100000000
+
 // #include "CycleTimer.h"
 using namespace std::chrono;
 
@@ -264,7 +274,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	pair.*/
     //std::priority_queue<pPair, vector<pPair>, compare> openList;
 
-	pq_t *openList = pq_init(10);
+	pq_t *openList = pq_init(DEFAULT_OFFSET);
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
