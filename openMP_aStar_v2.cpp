@@ -288,7 +288,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			// To store the 'g', 'h' and 'f' of the 4 successors
 			double gNew, hNew, fNew;
 			
-			// printf("size %d\n", openList.size());
+			printf("processing...\n");
 			Pair *p = (Pair*)deletemin(openList);
 			if(p==NULL){
 				continue;

@@ -337,8 +337,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 							omp_set_lock(&cellLock);
 							cellDetails[x*dim_y+y].parent_i = i;
 							cellDetails[x*dim_y+y].parent_j = j;
-							omp_unset_lock(&cellLock);
 							foundDest = true;
+							omp_unset_lock(&cellLock);
 						}
 						if (isUnBlocked(map, x, y, dim_y) == true) {
 							omp_set_lock(&openListLock);
