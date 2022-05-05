@@ -289,8 +289,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 if (isValid(x, y, dim_x, dim_y) == true) {
                     // If the destination cell is the same as the
                     // current successor
-                    if (isDestination(x, y, dest) =
-                    = true) {
+                    if (isDestination(x, y, dest) == true) {
                         localFoundDest = true;
                         foundDest = true;
                         //update if you have better path
