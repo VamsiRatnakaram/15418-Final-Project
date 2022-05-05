@@ -4,12 +4,15 @@ OBJS += seq_aStar.o
 CXX = g++ -m64 -std=c++11
 CXXFLAGS = -O3 -Wall -Wextra
 
-APP_NAME_MP=openMP_aStar_v2
-OBJS_MP += PR/common.o
-OBJS_MP += PR/ptst.o
-OBJS_MP += PR/gc.o
-OBJS_MP += PR/prioq.o
-OBJS_MP += openMP_aStar_v2.o
+APP_NAME_MP1=openMP_aStar
+OBJS_MP1 += openMP_aStar.o
+
+APP_NAME_MP2=openMP_aStar_v2
+OBJS_MP2 += PR/common.o
+OBJS_MP2 += PR/ptst.o
+OBJS_MP2 += PR/gc.o
+OBJS_MP2 += PR/prioq.o
+OBJS_MP2 += openMP_aStar_v2.o
 
 CXX_MP = g++ -m64 -std=c++11
 CXXFLAGS_MP = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas
@@ -25,10 +28,15 @@ default: $(APP_NAME)
 $(APP_NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
 
-openMP: $(APP_NAME_MP)
+openMP1: $(APP_NAME_MP1)
 
-$(APP_NAME_MP): $(OBJS_MP)
-	$(CXX_MP) $(CXXFLAGS_MP) -o $@ $(OBJS_MP)
+$(APP_NAME_MP1): $(OBJS_MP1)
+	$(CXX_MP) $(CXXFLAGS_MP) -o $@ $(OBJS_MP1)
+
+openMP2: $(APP_NAME_MP2)
+
+$(APP_NAME_MP2): $(OBJS_MP2)
+	$(CXX_MP) $(CXXFLAGS_MP) -o $@ $(OBJS_MP2)
 
 openMPI: $(APP_NAME_MPI)
 
