@@ -342,7 +342,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
+    double endTime = MPI_Wtime();
+	double computeTime = endTime - startTime;
 
     MPI_Status status;
 
@@ -365,8 +366,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 
 	MPI_Barrier(MPI_COMM_WORLD);
     // EndTime before I/O
-    double endTime = MPI_Wtime();
-	double computeTime = endTime - startTime;
 
     bool traceDone = false;
 
@@ -472,65 +471,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 fprintf(outFile, "\n");
             }
         }   
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    traceDone = false;
-
-    if (procID == 0) {
-        stack<Pair> Path;
-        Pair tmpPair = make_pair(dest.first, dest.second);
-        Path.push(tmpPair);
-        tmpPair = make_pair(globalDestVertex.second.first, globalDestVertex.second.second);
-	    
-        while(tmpPair.first != src.first || tmpPair.second != src.second) {
-            Path.push(tmpPair);
-
-            int ownerNode = (tmpPair.first*dim_y + tmpPair.second) % nproc;
-            if (ownerNode != procID) {
-                MPI_Send((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_REQ, MPI_COMM_WORLD);
-                MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_PAIR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            }
-            else {
-                tmpPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
-            }
-        }
-        traceDone=true;
-        Path.push(tmpPair);
-
-        for (int node = 0; node < nproc; node++) {
-            if (node != procID) {
-                MPI_Isend((void*)(&traceDone), 1, MPI_BYTE, node, TAG_BOOL, MPI_COMM_WORLD, &request);
-            }
-        }
-
-        int pathLength=0;
-        while (!Path.empty()) {
-            pathLength++;
-		    pair<int, int> p = Path.top();
-		    Path.pop();
-		    fprintf(outFile, "%d %d\n", p.first, p.second);
-	    }
-        fprintf(outFile, "LENGTH %d", pathLength);
-    }
-
-    while (!traceDone) {
-        int flag;
-        int flag_done;
-        Pair tmpPair;
-        Pair parentPair;
-        MPI_Iprobe(0, TAG_BOOL, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-        if (flag_done) {
-            MPI_Irecv((void*)(&traceDone), 1, MPI_BYTE, 0, TAG_BOOL, MPI_COMM_WORLD, &request);
-        }
-
-        MPI_Iprobe(0, TAG_REQ, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-		if (flag) {
-			MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, 0, TAG_REQ, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            parentPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
-            MPI_Send((void*)(&parentPair), 8, MPI_BYTE, 0, TAG_PAIR, MPI_COMM_WORLD);
-        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

@@ -252,7 +252,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const ch
 	// We set this boolean value as false as initially
 	// the destination is not reached.
 	bool foundDest = false;
-	int e=0;
 	while (openList.size() != 0 && !foundDest) {
 
 		pPair p = openList.top();
