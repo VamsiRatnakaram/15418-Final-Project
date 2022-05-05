@@ -330,13 +330,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, const ch
 
 		closedList[i][j] = true;
 	}
-
-	printf("elements worked on:%d\n",e);
-
+	clock_gettime(CLOCK_REALTIME, &requestEnd);
 	printf("The destination cell is found\n");
 	tracePath(cellDetails, dest, dim_y);
-
-	clock_gettime(CLOCK_REALTIME, &requestEnd);
 	// Calculate time it took
 	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 

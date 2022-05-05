@@ -364,6 +364,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     }
 
 	MPI_Barrier(MPI_COMM_WORLD);
+    // EndTime before I/O
+    double endTime = MPI_Wtime();
+	double computeTime = endTime - startTime;
 
     bool traceDone = false;
 
@@ -426,10 +429,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    // EndTime before I/O
-    double endTime = MPI_Wtime();
-	double computeTime = endTime - startTime;
 
 
     // File outputs

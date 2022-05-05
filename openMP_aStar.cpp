@@ -371,11 +371,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 		}
 		// printf("Thread num:%d, elements worked on:%d\n",omp_get_thread_num(),e);
 	}
-
+	clock_gettime(CLOCK_REALTIME, &requestEnd);
 	printf("The destination cell is found\n");	
 	tracePath(cellDetails, dest, dim_y);
-
-	clock_gettime(CLOCK_REALTIME, &requestEnd);
 	// Calculate time it took
 	double accum = ( requestEnd.tv_sec - requestStart.tv_sec ) + ( requestEnd.tv_nsec - requestStart.tv_nsec )/ BILLION;
 
