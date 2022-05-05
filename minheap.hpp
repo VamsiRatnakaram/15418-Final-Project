@@ -297,7 +297,7 @@ public:
         {
             // If value of child node is smaller than the parent node
             // Min heap property is not satisfied and 0 is returned
-            if (heap[i]->first < heap[(i - 1) / 2]->first)
+            if (heap[i].first < heap[(i - 1) / 2].first)
             {
                 std::cout << i;
                 return 0;
