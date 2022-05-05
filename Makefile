@@ -9,8 +9,8 @@ OBJS_MP1 += openMP_aStar.o
 
 APP_NAME_MP2=openMP_aStar_v2
 OBJS_MP2 += PR/common.o
-OBJS_MP2 += PR/ptst.o
-OBJS_MP2 += PR/gc.o
+OBJS_MP2 += PR/gc/ptst.o
+OBJS_MP2 += PR/gc/gc.o
 OBJS_MP2 += PR/prioq.o
 OBJS_MP2 += openMP_aStar_v2.o
 

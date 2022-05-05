@@ -104,7 +104,9 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
+        MPI_Wait(&request, MPI_STATUS_IGNORE);
 		MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, indexToSend, TAG_CELL, MPI_COMM_WORLD, &request);
+        MPI_Wait(&request, MPI_STATUS_IGNORE);
 	}
 }
 
@@ -214,7 +216,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                     pPair tmpPair;
                     cell tmpCell;
                     MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                     MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
 
                     int x = tmpPair.second.first;
                     int y = tmpPair.second.second;
@@ -238,6 +242,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 pair<bool, int> tmp;
                 if (flag_done){
                     MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                     foundDest = tmp.first;
                     globalBestCost = min(tmp.second,globalBestCost);
                 }
@@ -303,6 +308,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                                     if (node != procID) {
                                         pair<bool, int> tmp = make_pair(foundDest, localDestCost);
                                         MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                                        MPI_Wait(&request, MPI_STATUS_IGNORE);
                                     }
                                 }
                             }
@@ -395,6 +401,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
         for (int node = 0; node < nproc; node++) {
             if (node != procID) {
                 MPI_Isend((void*)(&traceDone), 1, MPI_BYTE, node, TAG_BOOL, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
             }
         }
 
@@ -415,6 +422,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
         MPI_Iprobe(0, TAG_BOOL, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
         if (flag_done) {
             MPI_Irecv((void*)(&traceDone), 1, MPI_BYTE, 0, TAG_BOOL, MPI_COMM_WORLD, &request);
+            MPI_Wait(&request, MPI_STATUS_IGNORE);
         }
 
         MPI_Iprobe(0, TAG_REQ, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
