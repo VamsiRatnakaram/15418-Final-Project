@@ -106,7 +106,9 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 	}
 	else {
 		MPI_Isend((void*)(&pairToSend), 16, MPI_BYTE, indexToSend, TAG_DATA, MPI_COMM_WORLD, &request);
+        MPI_Wait(&request, MPI_STATUS_IGNORE);
 		MPI_Isend((void*)(&cellToSend), 32, MPI_BYTE, indexToSend, TAG_CELL, MPI_COMM_WORLD, &request);
+        MPI_Wait(&request, MPI_STATUS_IGNORE);
 	}
 }
 
@@ -115,6 +117,7 @@ void hashedSendFunction(pPair pairToSend, int dim_x, int nproc, int procID, std:
 // to A* Search Algorithm
 double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int procID, int nproc, const char* input_filename)
 {
+    (void) input_filename;
     // StartTime after intialization
     double startTime = MPI_Wtime();
 	// If the source is out of range
@@ -214,7 +217,9 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 while (flag_data && flag_cell)
                 {
                     MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                     MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
 
                     int x = tmpPair.second.first;
                     int y = tmpPair.second.second;
@@ -235,6 +240,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 pair<bool, int> tmp;
                 if (flag_done){
                     MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                     conditionFlag=false;
                     break;
                 }
@@ -294,6 +300,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                                 if (node != procID) {
                                     pair<bool, int> tmp = make_pair(localFoundDest, localDestCost);
                                     MPI_Isend((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                                    MPI_Wait(&request, MPI_STATUS_IGNORE);
                                 }
                         }
                         break;
@@ -316,17 +323,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 }
             }
         }
-        // bool tmpLocalFoundDestArray[nproc];
-        // bool tmpBool = false;
-        // MPI_Allgather(&localFoundDest, 1, MPI_BYTE, tmpLocalFoundDestArray, 1, MPI_BYTE, MPI_COMM_WORLD);
-        // for(int p = 0; p<nproc; p++) {
-        //     if(tmpLocalFoundDestArray[p]) {
-        //         tmpBool = true;
-        //     }
-        // }
-        // if (tmpBool) {
-        //     break;
-        // }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -416,110 +412,36 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     double endTime = MPI_Wtime();
 	double computeTime = endTime - startTime;
 
+    for (int node = 0; node < nproc; node++)
+    {
+        pPair tmpPair;
+        cell tmpCell;
+        pair<bool, int> tmp;
+        int flag_data = 0;
+        int flag_done = 0;
+        int flag_cell = 0;
+        if (node != procID)
+        {	
+            MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+            MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+            while (flag_data && flag_cell)
+            {
+                MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
+                MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
 
-    // File outputs
-	char resolved_path[PATH_MAX];
-    realpath(input_filename, resolved_path);
-    char *base = basename(resolved_path);
-    std::string baseS = std::string(base);
-    size_t lastindex = baseS.find_last_of("."); 
-    string rawname = baseS.substr(0, lastindex); 
-
-    std::stringstream Output;
-    Output << "outputs//openMPI_" << rawname.c_str() << "_" << nproc << ".txt";
-    std::string OutputFile = Output.str();
-    const char *ocf = OutputFile.c_str();
-
-    int *mapSearch = (int*)calloc(dim_x*dim_y, sizeof(int));
-    for (int a = 0; a < dim_y; a++) {
-        for (int b = 0; b < dim_x; b++) {
-            if (cellDetails[a*dim_y+b].parent_i != -1) {
-                mapSearch[a*dim_y+b] = 1;
+                MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+                MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
             }
-            else {
-                mapSearch[a*dim_y+b] = 0;
+            
+            MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+            if (flag_done){
+                MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
             }
         }
     }
-
-    int *allMapSearch = (int*)calloc(dim_x*dim_y*nproc, sizeof(int));
-    MPI_Gather(mapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, allMapSearch, dim_x*dim_y*sizeof(int), MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    FILE *outFile; 
-    if (procID == 0) {
-        outFile = fopen(ocf, "w+");
-        fprintf(outFile, "%d %d %d \n", dim_x, dim_y, nproc);
-        for (int node = 0; node < nproc; node++) {
-            for (int a = 0; a < dim_y; a++) {
-                for (int b = 0; b < dim_x; b++) {
-                    fprintf(outFile, "%d ", allMapSearch[node*dim_x*dim_y + (a*dim_y + b)]);
-                }
-                fprintf(outFile, "\n");
-            }
-        }   
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    traceDone = false;
-
-    if (procID == 0) {
-        stack<Pair> Path;
-        Pair tmpPair = make_pair(dest.first, dest.second);
-        Path.push(tmpPair);
-        tmpPair = make_pair(globalDestVertex.second.first, globalDestVertex.second.second);
-	    
-        while(tmpPair.first != src.first || tmpPair.second != src.second) {
-            Path.push(tmpPair);
-
-            int ownerNode = (tmpPair.first*dim_y + tmpPair.second) % nproc;
-            if (ownerNode != procID) {
-                MPI_Send((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_REQ, MPI_COMM_WORLD);
-                MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, ownerNode, TAG_PAIR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            }
-            else {
-                tmpPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
-            }
-        }
-        traceDone=true;
-        Path.push(tmpPair);
-
-        for (int node = 0; node < nproc; node++) {
-            if (node != procID) {
-                MPI_Isend((void*)(&traceDone), 1, MPI_BYTE, node, TAG_BOOL, MPI_COMM_WORLD, &request);
-            }
-        }
-
-        int pathLength=0;
-        while (!Path.empty()) {
-            pathLength++;
-		    pair<int, int> p = Path.top();
-		    Path.pop();
-		    fprintf(outFile, "%d %d\n", p.first, p.second);
-	    }
-        fprintf(outFile, "LENGTH %d", pathLength);
-    }
-
-    while (!traceDone) {
-        int flag;
-        int flag_done;
-        Pair tmpPair;
-        Pair parentPair;
-        MPI_Iprobe(0, TAG_BOOL, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-        if (flag_done) {
-            MPI_Irecv((void*)(&traceDone), 1, MPI_BYTE, 0, TAG_BOOL, MPI_COMM_WORLD, &request);
-        }
-
-        MPI_Iprobe(0, TAG_REQ, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-		if (flag) {
-			MPI_Recv((void*)(&tmpPair), 8, MPI_BYTE, 0, TAG_REQ, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            parentPair = make_pair(cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_i, cellDetails[tmpPair.first*dim_y + tmpPair.second].parent_j);
-            MPI_Send((void*)(&parentPair), 8, MPI_BYTE, 0, TAG_PAIR, MPI_COMM_WORLD);
-        }
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
 
 	return computeTime;
 }

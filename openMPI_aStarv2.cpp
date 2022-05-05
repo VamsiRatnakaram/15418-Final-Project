@@ -437,6 +437,36 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+    for (int node = 0; node < nproc; node++)
+    {
+        pPair tmpPair;
+        cell tmpCell;
+        pair<bool, int> tmp;
+        int flag_data = 0;
+        int flag_done = 0;
+        int flag_cell = 0;
+        if (node != procID)
+        {	
+            MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+            MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+            while (flag_data && flag_cell)
+            {
+                MPI_Irecv((void*)(&tmpPair), 16, MPI_BYTE, node, TAG_DATA, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
+                MPI_Irecv((void*)(&tmpCell), 32, MPI_BYTE, node, TAG_CELL, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
+                
+                MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
+                MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
+            }
+            MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+            if (flag_done){
+                MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                MPI_Wait(&request, MPI_STATUS_IGNORE);
+            }
+        }
+    }
+
 
     // // File outputs
 	// char resolved_path[PATH_MAX];
