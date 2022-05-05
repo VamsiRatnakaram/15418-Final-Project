@@ -230,14 +230,13 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                     }
                     MPI_Iprobe(node, TAG_DATA, MPI_COMM_WORLD, &flag_data, MPI_STATUS_IGNORE);
                     MPI_Iprobe(node, TAG_CELL, MPI_COMM_WORLD, &flag_cell, MPI_STATUS_IGNORE);
-
-                    MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
-                    pair<bool, int> tmp;
-                    if (flag_done){
-                        MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
-                        conditionFlag=false;
-                        break;
-                    }
+                }
+                MPI_Iprobe(node, TAG_DONE, MPI_COMM_WORLD, &flag_done, MPI_STATUS_IGNORE);
+                pair<bool, int> tmp;
+                if (flag_done){
+                    MPI_Irecv((void*)(&tmp), 8, MPI_BYTE, node, TAG_DONE, MPI_COMM_WORLD, &request);
+                    conditionFlag=false;
+                    break;
                 }
             }
         }
