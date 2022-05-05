@@ -1,4 +1,18 @@
+#include <iostream>
+#include <deque>
+#include <vector>
+#include <mutex>
+#include <shared_mutex>
+#include <vector>
+#include <algorithm>
+#include <bits/stdc++.h>
 #include "minheap.hpp"
+
+// Creating a shortcut for int, int pair type
+typedef pair<int, int> Pair;
+
+// Creating a shortcut for pair<int, pair<int, int>> type
+typedef pair<double, pair<int, int> > pPair;
 
 int main(){
     MinHeap heap;
@@ -11,5 +25,5 @@ int main(){
     heap.insert(&tmp3);
 
     heap.print();
-    return;
+    return 0;
 }
