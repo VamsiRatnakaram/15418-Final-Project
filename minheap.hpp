@@ -177,8 +177,9 @@ private:
 
 public:
     // Deletion of the root node from the heap
-    void remove()
+    pPair remove()
     {
+        pPair ret;
         size_mtx.lock();
 
         int heapSize = size;
@@ -195,6 +196,8 @@ public:
 
             // Swap the root nodes data with the last eelement's data
             swap(0, heapSize - 1);
+
+            ret = heap[heapSize-1];
 
             ele_mtx[0].unlock();
             ele_mtx[heapSize - 1].unlock();
@@ -216,6 +219,7 @@ public:
         }
         else
             size_mtx.unlock();
+        return ret;
     }
 
     // // Searching for a node with data - ele in the heap

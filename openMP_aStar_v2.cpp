@@ -268,7 +268,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	pair.*/
     //std::priority_queue<pPair, vector<pPair>, compare> openList;
 
-	moodycamel::ConcurrentQueue<int> q;
+	// moodycamel::ConcurrentQueue<int> q;
+	MinHeap heap;
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0

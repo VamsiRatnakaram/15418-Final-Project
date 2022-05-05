@@ -24,6 +24,9 @@ int main(){
     pPair tmp3 = make_pair(6.0, make_pair(0, 0));
     heap.insert(tmp3);
 
+    pPair tmp4 = heap.remove();
+
     heap.print();
+    printf("%d \n", tmp4.first);
     return 0;
 }
