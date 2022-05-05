@@ -27,6 +27,8 @@
 #include <omp.h>
 #include <bits/stdc++.h>
 
+using namespace std;
+
 // Creating a shortcut for int, int pair type
 typedef pair<int, int> Pair;
 
@@ -38,7 +40,7 @@ typedef pair<double, pair<int, int> > pPair;
 class MinHeap
 {
 private:
-    std::deque<pair<double, pair<int, int> >*> heap; // Stores Min Heap Data Structure
+    std::deque<pPair*> heap; // Stores Min Heap Data Structure
     int size = 0;         // Stores size of heap
 
     // Read-write mutexes to protect shared data from being simultaneously accessed by multiple threads.
