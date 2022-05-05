@@ -40,7 +40,7 @@ typedef pair<double, pair<int, int> > pPair;
 class MinHeap
 {
 private:
-    std::deque<pPair, vector<pPair>> heap; // Stores Min Heap Data Structure
+    std::deque<pPair> heap; // Stores Min Heap Data Structure
     int size = 0;         // Stores size of heap
 
     // Read-write mutexes to protect shared data from being simultaneously accessed by multiple threads.
