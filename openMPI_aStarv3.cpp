@@ -369,12 +369,16 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
         }
 
         printf("\nThe Path is ");
+        int i=0;
         while (!Path.empty()) {
 		    pair<int, int> p = Path.top();
 		    Path.pop();
 		    printf("-> (%d,%d) ", p.first, p.second);
+            i++;
+
 	    }
         printf("\n");
+        printf("The path cost: %d\n",i);
     }
 
     while (!traceDone) {

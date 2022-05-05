@@ -99,11 +99,14 @@ void tracePath(cell *cellDetails, Pair dest, int dim_y)
 	}
 
 	Path.push(make_pair(row, col));
+	int i=0;
 	while (!Path.empty()) {
 		pair<int, int> p = Path.top();
 		Path.pop();
 		printf("-> (%d,%d) ", p.first, p.second);
+		i++;
 	}
+	printf("The path cost:%d\n",i);
 
 	return;
 }
