@@ -195,6 +195,7 @@ public:
             ele_mtx[0].lock();
 
             ret = heap[0]; // min Node
+            printf(ret.first);
 
             // Swap the root nodes data with the last eelement's data
             swap(0, heapSize - 1);
