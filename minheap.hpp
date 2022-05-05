@@ -194,10 +194,10 @@ public:
             ele_mtx[heapSize - 1].lock();
             ele_mtx[0].lock();
 
+            ret = heap[0]; // min Node
+
             // Swap the root nodes data with the last eelement's data
             swap(0, heapSize - 1);
-
-            ret = heap[heapSize-1];
 
             ele_mtx[0].unlock();
             ele_mtx[heapSize - 1].unlock();
