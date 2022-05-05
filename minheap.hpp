@@ -262,7 +262,7 @@ public:
         }
         while (i < hsize)
         {
-            std::cout << heap[i]->first << " ";
+            std::cout << heap[i].first << " ";
             i++;
         }
         std::cout << "\n";
@@ -270,7 +270,7 @@ public:
     }
 
     // Inserts node with data ele into the heap
-    void insert(int ele)
+    void insert(pPair ele)
     {
 
         // Locks new updates to heap like remove and inserts to prevent data races
