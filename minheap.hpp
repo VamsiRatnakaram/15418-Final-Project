@@ -40,7 +40,7 @@ typedef pair<double, pair<int, int> > pPair;
 class MinHeap
 {
 private:
-    std::deque<pPair*> heap; // Stores Min Heap Data Structure
+    std::deque<pPair, vector<pPair>> heap; // Stores Min Heap Data Structure
     int size = 0;         // Stores size of heap
 
     // Read-write mutexes to protect shared data from being simultaneously accessed by multiple threads.
@@ -52,8 +52,8 @@ private:
     // Swaps data present at node positions i and j of heap
     void swap(int i, int j)
     {
-        int temp1 = heap[i];
-        int temp2 = heap[j];
+        pPair temp1 = heap[i];
+        pPair temp2 = heap[j];
         heap[i] = temp2;
         heap[j] = temp1;
     }
@@ -79,7 +79,7 @@ private:
 
         // If ith node is greater than its parent, swap and
         // recurively call heapify on parent node
-        if (heap[i]->first < heap[parent]->first)
+        if (heap[i].first < heap[parent].first)
         {
             swap(i, parent);
 
@@ -124,7 +124,7 @@ private:
         ele_mtx[i].lock_shared();
 
         // If the left child is smaller than the ith node
-        if (l < size && heap[l]->first < heap[smallest]->first)
+        if (l < size && heap[l].first < heap[smallest].first)
             smallest = l;
 
         // Unlock the 2 nodes before calling the next heapify recursively
@@ -136,7 +136,7 @@ private:
         ele_mtx[i].lock_shared();
 
         // If the right child is smaller than the ith node
-        if (r < size && heap[r]->first < heap[smallest]->first)
+        if (r < size && heap[r].first < heap[smallest].first)
             smallest = r;
 
         // Unlock the 2 nodes before calling the next heapify recursively
