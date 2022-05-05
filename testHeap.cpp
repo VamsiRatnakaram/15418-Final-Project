@@ -27,6 +27,6 @@ int main(){
     pPair tmp4 = heap.remove();
 
     heap.print();
-    printf("%d \n", tmp4.first);
+    printf("%lf \n", tmp4.first);
     return 0;
 }
