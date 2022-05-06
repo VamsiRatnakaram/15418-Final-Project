@@ -277,6 +277,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 	// temp->first=l;
 	// temp->second=m;
 	heap.insert(make_pair(0.0, make_pair(l, m)));
+	heap.print();
 	// insert(openList,0.0,(void*)temp);
 	//openList.push(make_pair(0.0, make_pair(l, m)));
 
