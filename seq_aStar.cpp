@@ -76,7 +76,8 @@ bool isDestination(int row, int col, Pair dest)
 double calculateHValue(int row, int col, Pair dest)
 {
 	// Return Manhatten distance
-	return abs(dest.second - col) + abs(dest.first - row);
+	// return abs(dest.second - col) + abs(dest.first - row);
+	return 0;
 }
 
 // A Utility Function to trace the path from the source

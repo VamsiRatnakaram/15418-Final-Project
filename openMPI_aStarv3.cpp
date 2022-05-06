@@ -194,6 +194,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
     pPair localDestVertex;
     int conditionFlag = true;
     bool emptyBool[nproc];
+    bool closedList[dim_x][dim_y]; // only for visualization purposes
 	while (conditionFlag) {
         for (int node = 0; node < nproc; node++)
         {
@@ -249,6 +250,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
             // Add this vertex to the closed list
             i = p.second.first;
             j = p.second.second;
+
+            closedList[i][j] = true;
 
             // To store the 'g', 'h' and 'f' of the 4 successors
             double gNew, hNew, fNew;
@@ -430,6 +433,39 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int proc
                 MPI_Wait(&request, MPI_STATUS_IGNORE);
             }
         }
+    }
+
+
+    // File outputs
+	char resolved_path[PATH_MAX];
+    realpath(input_filename, resolved_path);
+    char *base = basename(resolved_path);
+    std::string baseS = std::string(base);
+    size_t lastindex = baseS.find_last_of("."); 
+    string rawname = baseS.substr(0, lastindex);
+
+    std::stringstream Output;
+    Output << "outputs//openMPI_" << rawname.c_str() << "_" << nproc << ".txt";
+    std::string OutputFile = Output.str();
+    const char *ocf = OutputFile.c_str();
+
+    bool *allMapSearch = (bool*)calloc(dim_x*dim_y*nproc, sizeof(int));
+    MPI_Gather(closedList, dim_x*dim_y*sizeof(bool), MPI_BYTE, allMapSearch, dim_x*dim_y*sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    FILE *outFile; 
+    if (procID == 0) {
+        outFile = fopen(ocf, "w+");
+        fprintf(outFile, "%d %d %d \n", dim_x, dim_y, nproc);
+        for (int node = 0; node < nproc; node++) {
+            for (int a = 0; a < dim_y; a++) {
+                for (int b = 0; b < dim_x; b++) {
+                    if (allMapSearch[node*dim_x*dim_y + (a*dim_y + b)]) fprintf(outFile, "%d ", 1);
+                    else fprintf(outFile, "%d ", 0);
+                }
+                fprintf(outFile, "\n");
+            }
+        }   
     }
 
 	return computeTime;
