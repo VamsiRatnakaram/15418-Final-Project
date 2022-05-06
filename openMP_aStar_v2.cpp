@@ -293,8 +293,6 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			int i, j, x, y, z;
 			// To store the 'g', 'h' and 'f' of the 4 successors
 			double gNew, hNew, fNew;
-			
-			printf("processing...\n");
 
 			pPair p = heap.remove();
 			// Pair *p = (Pair*)deletemin(openList);
@@ -310,6 +308,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			}
 			closedList[i][j]=true;
 			omp_unset_lock(&closedLocks[i][j]);
+
+			printf("seeing node %d %d", i, j);
 			/*	
 			Generating all the 4 successor of this cell
 			Cell-->Popped Cell (i, j)
