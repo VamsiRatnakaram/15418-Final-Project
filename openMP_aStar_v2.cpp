@@ -301,8 +301,8 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			if(p==NULL){
 				continue;
 			}
-			i = p.first;
-			j = p.second;
+			i = p.second.first;
+			j = p.second.second;
 			omp_set_lock(&closedLocks[i][j]);
 			if(closedList[i][j]){
 				omp_unset_lock(&closedLocks[i][j]);
