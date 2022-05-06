@@ -39,4 +39,4 @@ Week 4- Optimize workload balance using different techniques
 
 
 Final project Link - https://docs.google.com/document/d/102G05jKkQIS_K6AWKd4xdMeK1oL_6LUE_sjb7x_WVSw/edit?usp=sharing
-Video Presentation Link - 
+Video Presentation Link - https://youtu.be/5zbb2NOdgsI
