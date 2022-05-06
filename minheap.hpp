@@ -214,6 +214,7 @@ public:
         else if (heapSize == 1)
         {
             size = 0;
+            ret = heap[0];
             heap.pop_back();
             size_mtx.unlock();
         }
