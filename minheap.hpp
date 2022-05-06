@@ -179,7 +179,7 @@ public:
     // Deletion of the root node from the heap
     pPair remove()
     {
-        pPair ret;
+        pPair ret = make_pair(-1.0, make_pair(0,0));
         size_mtx.lock();
 
         int heapSize = size;

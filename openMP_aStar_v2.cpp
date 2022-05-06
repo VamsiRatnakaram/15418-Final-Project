@@ -298,7 +298,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 
 			pPair p = heap.remove();
 			// Pair *p = (Pair*)deletemin(openList);
-			if(p==NULL){
+			if(p.first == -1.0){
 				continue;
 			}
 			i = p.second.first;
