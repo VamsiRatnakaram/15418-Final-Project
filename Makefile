@@ -13,6 +13,9 @@ OBJS_MP2 += openMP_aStar_v2.o
 CXX_MP = g++ -m64 -std=c++11
 CXXFLAGS_MP = -I. -g -O3 -Wall -fopenmp -Wno-unknown-pragmas
 
+CXX_MP2 = g++ -m64 -std=c++17 
+CXXFLAGS_MP2 = -I. -g -O3 -Wall -fopenmp -Wno-unknown-pragmas -lpthread
+
 APP_NAME_MPI1=openMPI_aStarv2
 OBJS_MPI1 += openMPI_aStarv2.o
 
@@ -38,7 +41,7 @@ $(APP_NAME_MP1): $(OBJS_MP1)
 openMP2: $(APP_NAME_MP2)
 
 $(APP_NAME_MP2): $(OBJS_MP2)
-	$(CXX_MP) $(CXXFLAGS_MP) -o $@ $(OBJS_MP2)
+	$(CXX_MP2) $(CXXFLAGS_MP2) -o $@ $(OBJS_MP2)
 
 openMPI1: $(APP_NAME_MPI1)
 
@@ -62,7 +65,7 @@ openMP_aStar.o: openMP_aStar.cpp
 	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
 
 openMP_aStar_v2.o: openMP_aStar_v2.cpp
-	$(CXX_MP) $< $(CXXFLAGS_MP) -c -o $@
+	$(CXX_MP2) $< $(CXXFLAGS_MP2) -c -o $@
 
 openMPI_aStarv2.o: openMPI_aStarv2.cpp
 	$(CXX_MPI) $< $(CXXFLAGS_MPI) -c -o $@

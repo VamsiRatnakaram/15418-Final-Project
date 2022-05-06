@@ -273,9 +273,10 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 
 	// Put the starting cell on the open list and set its
 	// 'f' as 0
-	Pair *temp= (Pair*)(malloc(sizeof(Pair)));
-	temp->first=l;
-	temp->second=m;
+	// Pair *temp= (Pair*)(malloc(sizeof(Pair)));
+	// temp->first=l;
+	// temp->second=m;
+	heap.insert(make_pair(0.0, make_pair(l, m)))
 	// insert(openList,0.0,(void*)temp);
 	//openList.push(make_pair(0.0, make_pair(l, m)));
 
@@ -294,13 +295,14 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 			double gNew, hNew, fNew;
 			
 			printf("processing...\n");
+
+			pPair p = heap.remove();
 			// Pair *p = (Pair*)deletemin(openList);
 			if(p==NULL){
 				continue;
 			}
-			i = p->first;
-			j = p->second;
-			free(p);
+			i = p.first;
+			j = p.second;
 			omp_set_lock(&closedLocks[i][j]);
 			if(closedList[i][j]){
 				omp_unset_lock(&closedLocks[i][j]);
@@ -356,10 +358,7 @@ double aStarSearch(int *map, Pair src, Pair dest, int dim_x, int dim_y, int npro
 						if (cellDetails[x*dim_y+y].f == INT_MAX || cellDetails[x*dim_y+y].f > fNew) {
 							
 							if (!closedList[x][y]){
-								Pair *temp= (Pair*)(malloc(sizeof(Pair)));
-								temp->first=x;
-								temp->second=y;
-								insert(openList,fNew,(void*)temp);
+								heap.insert(make_pair(fNew, make_pair(x, y)));
 							} 
 
 							// Update the details of this cell
